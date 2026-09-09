@@ -106,8 +106,6 @@ const login = (req, res) => {
       return res.status(401).json({ msg: 'Credenciales inválidas' });
     }
 
-    console.log('Contraseña ingresada:', contraseña);
-    console.log('Hash en base de datos:', user.contraseña);
 
     // Comparar la contraseña
     bcrypt.compare(contraseña, user.contraseña, (err, isMatch) => {

@@ -109,6 +109,17 @@ const BasicLayout = () => {
                 src="/logo1.png"
                 alt="Profile"
                 className={`Profile_image ${collapsed ? 'hidden' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  const rol = user?.rol?.toLowerCase().trim();
+                  if (rol === 'administrador') {
+                    navigate('/dashboard');
+                  } else if (rol === 'auditor') {
+                    navigate('/dashboardAuditor');
+                  } else {
+                    navigate('/');
+                  }
+                }}
               />
               <div className="profile-text">
                 <h2 className="profile-brand">Audit RGA</h2>

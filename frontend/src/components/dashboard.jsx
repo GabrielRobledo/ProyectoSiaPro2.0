@@ -416,7 +416,7 @@ return (
       <ResumenAuditorias />
     </Box>
   </div>
-);
+);  
 
 };
 

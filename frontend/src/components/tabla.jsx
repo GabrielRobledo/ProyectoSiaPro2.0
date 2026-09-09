@@ -466,7 +466,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
       icon: 'success',
       title: 'Borrador guardado correctamente',
     }).then(() => {
-      window.location.href = '/auditoriasParciales'; 
+      navigate('/auditoriasParciales'); 
     });
   } catch (err) {
     console.error('Error guardando borrador:', err);
@@ -622,7 +622,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
         }}
       >
         {/* Lado izquierdo */}
-        <div style={{ display: 'flex', gap: '10px' }}> {/* Se añadió gap aquí */}
+        <div style={{ display: 'flex', gap: '10px' }}> 
           <button
             onClick={handleEnviarRegistros}
             style={{

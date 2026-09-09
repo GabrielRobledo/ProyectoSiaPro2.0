@@ -1,8 +1,10 @@
+import sys
+
 import MySQLdb
 import pandas as pd
 import numpy as np
-from tkinter import Tk
-from tkinter.filedialog import askopenfilename
+import sys
+
 
 
 # Crear la conexión con MySQL
@@ -10,13 +12,11 @@ db = MySQLdb.connect(host='localhost', user='root', db='db_siap')
 cursor = db.cursor()
 print('CONEXION EXITOSA')
 
-# Leo la base de datos en Excel y guardo en un DataFrame
-
-# Crear una ventana oculta para que no se muestre la interfaz de tkinter
-Tk().withdraw()
-
-# Abrir el explorador de archivos
-file_path = askopenfilename(title="Selecciona un archivo Excel", filetypes=[("Archivos Excel", "*.xlsx;*.xlsm")])
+if len(sys.argv) > 1:
+    file_path = sys.argv[1]
+else:
+    print("Error: No se recibió la ruta del archivo")
+    sys.exit(1)
 
 # Verificar que el usuario seleccionó un archivo
 if file_path:

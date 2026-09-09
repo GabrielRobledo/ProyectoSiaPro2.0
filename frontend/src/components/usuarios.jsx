@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { FiEdit, FiTrash2, FiRotateCcw } from 'react-icons/fi';
 import API_URL from '../config';
+import { useUser } from './contextUsers';
 
 const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
@@ -12,6 +13,9 @@ const Usuarios = () => {
   const navigate = useNavigate();
   const [passwordModalUser, setPasswordModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const { user: userLogged } = useUser();
+
+
 
   useEffect(() => {
     cargarUsuarios();
@@ -187,9 +191,8 @@ const Usuarios = () => {
                     />
                   )}
                 </td>
-
                 <td style={tdStyle}>
-                  {!user.delete_add && (
+                  {!user.delete_add && user.idUsuario !== parseInt(userLogged?.idUsuario) && (
                     <FiTrash2
                       onClick={() => handleDelete(user.idUsuario)}
                       style={{ cursor: 'pointer', color: '#d32f2f', fontSize: '1.6rem' }}

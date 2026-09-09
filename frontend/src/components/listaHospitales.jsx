@@ -1,31 +1,32 @@
+
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
-import {FaHospital, FaTasks} from 'react-icons/fa';
-import { useUser } from './contextUsers'; 
+import { useUser } from './contextUsers';
 import '../styles/cardsHosp.css';
 
 const ListadoHospitales = ({ atenciones }) => {
   const navigate = useNavigate();
+  const { user } = useUser();
 
+  // Agrupa atenciones por idEfector y cuenta por tipoAtencion
   const { resumen, tiposAtencionUnicos } = useMemo(() => {
-    const { user } = useUser();
     const resumen = {};
     const tiposSet = new Set();
 
     atenciones.forEach(({ RazonSocial, tipoAtencion, idEfector }) => {
-      const hospital = RazonSocial || 'Desconocido';
+      if (!idEfector) return;
       tiposSet.add(tipoAtencion);
 
-      if (!resumen[hospital]) {
-        resumen[hospital] = { idEfector, conteos: {} };
+      if (!resumen[idEfector]) {
+        resumen[idEfector] = { RazonSocial, conteos: {} };
       }
 
-      if (!resumen[hospital].conteos[tipoAtencion]) {
-        resumen[hospital].conteos[tipoAtencion] = 0;
+      if (!resumen[idEfector].conteos[tipoAtencion]) {
+        resumen[idEfector].conteos[tipoAtencion] = 0;
       }
 
-      resumen[hospital].conteos[tipoAtencion]++;
+      resumen[idEfector].conteos[tipoAtencion]++;
     });
 
     return {
@@ -34,23 +35,28 @@ const ListadoHospitales = ({ atenciones }) => {
     };
   }, [atenciones]);
 
+
+  const esAuditor = user?.rol?.toLowerCase().trim() === 'auditor';
   const handleClickHospital = (idEfector) => {
-    navigate(`/registros/atenciones?hospital=${encodeURIComponent(idEfector)}`);
+    if (esAuditor) {
+      navigate(`/registros/atenciones?hospital=${encodeURIComponent(idEfector)}`);
+    }
   };
 
   return (
     <div className="cards-grid">
-      {Object.entries(resumen).map(([hospital, { idEfector, conteos }]) => (
+      {Object.entries(resumen).map(([idEfector, { RazonSocial, conteos }]) => (
         <div
-          key={hospital}
+          key={idEfector}
           className="card"
           onClick={() => handleClickHospital(idEfector)}
+          style={{ cursor: esAuditor ? 'pointer' : 'not-allowed', opacity: esAuditor ? 1 : 0.7 }}
         >
           <div className="card-header">
             <div className="card-icon">
               <LocalHospitalIcon />
             </div>
-            <h3 className="card-title">{hospital}</h3>
+            <h3 className="card-title">{RazonSocial || 'Desconocido'}</h3>
           </div>
           <ul className="card-list">
             {tiposAtencionUnicos.map((tipo) => (

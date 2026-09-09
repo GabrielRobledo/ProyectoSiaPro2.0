@@ -238,7 +238,11 @@ const EstadisticasCierresAuditorias = () => {
                 >
                 <Box display="flex" alignItems="center" mb={1}>
                   <LocalHospitalIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">{Hospital}</Typography>
+                  <Typography
+                    variant="h6"
+                  >
+                    {Hospital}
+                  </Typography>
                 </Box>
                 <Typography variant="subtitle2" color="text.secondary" mb={2}>
                   Auditoría cerrada - Periodo: {auditoria.periodo}

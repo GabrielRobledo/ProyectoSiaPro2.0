@@ -47,16 +47,22 @@ const login = (req, res) => {
 
 
       // 📝 Registrar log de inicio de sesión
+      console.log('Intentando registrar log de inicio de sesión:', {
+        idUsuario: user.idUsuario,
+        accion: 'Inicio de sesión',
+        resultado: 'Exito',
+        descripcion: 'El usuario inició sesión correctamente.'
+      });
       LogModel.crearLog({
         idUsuario: user.idUsuario,
         accion: 'Inicio de sesión',
         resultado: 'Exito',
         descripcion: 'El usuario inició sesión correctamente.'
-      }, (err) => {
+      }, (err, result) => {
         if (err) {
           console.error('Error al registrar log de inicio de sesión:', err);
         } else {
-          console.log('✅ Log de inicio de sesión registrado');
+          console.log('✅ Log de inicio de sesión registrado', result);
         }
       });
     });

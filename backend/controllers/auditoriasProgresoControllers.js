@@ -93,9 +93,6 @@ const updateByIdSerial = async (req, res) => {
   }
 };
 
-
-
-
 module.exports = {
   saveOrUpdate,
   getDraft,

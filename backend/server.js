@@ -22,6 +22,7 @@ const modulosRoutes = require('./routes/modulosRoutes');
 const reportesRoutes = require('./routes/reportesRoutes');
 const logsRoutes = require('./routes/logsRoutes');
 const novedadesRoutes = require('./routes/novedadesRoutes');
+const importRoutes = require('./routes/importRoutes');
 
 // Middleware
 app.use(cors());
@@ -47,6 +48,7 @@ app.use('/api', modulosRoutes);
 app.use('/api', reportesRoutes)
 app.use('/api/logs', logsRoutes);
 app.use('/api', novedadesRoutes);
+app.use('/api', importRoutes);
 
 // Servidor
 const PORT = process.env.PORT || 3000;

@@ -24,6 +24,7 @@ import RutaProtegida from './components/rutasProtegidas';
 import RutaPorRol from './components/rutasPorRol';
 import AdminNovedades from './components/novedades';
 import Motivos from './components/motivosForms';
+import UpdatePeriodoFacturacion from './components/UpdatePeriodoFacturacion';
 
 
 const hoy = new Date();
@@ -58,6 +59,7 @@ const App = () => {
             <Route path='cierreDeAuditoria' element={<CierreDeAuditoria periodo={periodo} idUsuario={idUsuario} />} />
             <Route path='novedades' element={<AdminNovedades />} />
             <Route path='motivos' element={<Motivos />} />
+            <Route path='actualizar-datos' element={<UpdatePeriodoFacturacion />} />
           </Route>
 
           {/* Rutas solo para AUDITOR */}

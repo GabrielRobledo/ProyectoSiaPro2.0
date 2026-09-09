@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import { FiTrash2, FiRotateCcw } from 'react-icons/fi';
 import API_URL from '../config';
 import '../styles/registerUser.css';
+import { useUser } from './contextUsers';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ const RegisterForm = () => {
 
   const [users, setUsers] = useState([]);
   const [mostrarEliminados, setMostrarEliminados] = useState(false);
+  const { user: userLogged } = useUser();
 
   useEffect(() => {
     fetchUsers();
@@ -169,7 +171,7 @@ const RegisterForm = () => {
                 <td>{user.usuario}</td>
                 <td>{user.tipoUsuario}</td>
                 <td>
-                  {!user.delete_add && (
+                  {!user.delete_add && user.idUsuario !== parseInt(userLogged?.idUsuario) && (
                     <FiTrash2 onClick={() => handleDelete(user.idUsuario)} />
                   )}
                 </td>

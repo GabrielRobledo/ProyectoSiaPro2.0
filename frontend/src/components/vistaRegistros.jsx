@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import TablaConFiltro from './tabla';
 import ListadoHospitales from '../components/listaHospitales';
 import API_URL from '../config';
+import { useUser } from './contextUsers';
 
 const VistaRegistros = ({ editarAuditoria = false }) => {
   const { tipo, id } = useParams();
@@ -11,6 +12,20 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
 
   const [datos, setDatos] = useState([]);
   const [hospitales, setHospitales] = useState([]);
+  const { user } = useUser();
+  const [pendientes, setPendientes] = useState([]);
+  // 🔄 Traer hospitales pendientes de auditar asignados al auditor
+  useEffect(() => {
+    if (user?.idUsuario) {
+      fetch(`${API_URL}/api/asignaciones-sin-auditoria/${user.idUsuario}`)
+        .then(res => res.json())
+        .then(data => setPendientes(data))
+        .catch(err => {
+          setPendientes([]);
+          console.error('Error al obtener hospitales pendientes:', err);
+        });
+    }
+  }, [user]);
 
   // 🔄 Traer listado de hospitales (efectores)
   useEffect(() => {
@@ -92,8 +107,8 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   if (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) {
     return (
       <div>
-        <h2>Hospitales para auditar</h2>
-        <ListadoHospitales atenciones={datos} />
+        <h2>Hospitales pendientes de auditar</h2>
+        <ListadoHospitales atenciones={pendientes.length > 0 ? pendientes : datos} />
       </div>
     );
   }

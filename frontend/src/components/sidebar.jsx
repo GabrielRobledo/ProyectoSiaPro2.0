@@ -5,6 +5,7 @@ import {
   DatabaseOutlined,
   BarsOutlined,
   DashboardOutlined,
+  CloudUploadOutlined
 } from '@ant-design/icons';
 import '../styles/navbar.css';
 
@@ -68,6 +69,9 @@ const Sidebar = ({ onSeleccion }) => {
         </Menu.SubMenu>
         <Menu.Item key="novedades" icon={<BarsOutlined/>}>
           <Link to="/novedades">Novedades</Link>
+        </Menu.Item>
+        <Menu.Item key="updatePeriodo" icon={<CloudUploadOutlined />}>
+            <Link to="/actualizar-datos">Actualizar Periodo</Link>
         </Menu.Item>
         <Menu.Item key="motivos" icon={<BarsOutlined/>}>
           <Link to="/motivos">Motivos</Link>

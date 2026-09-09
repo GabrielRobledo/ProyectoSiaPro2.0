@@ -20,7 +20,19 @@ const AsignacionesSinAuditoria = {
     // Devuelve los efectores asignados a un usuario, solo ids
         // Devuelve los efectores asignados a un usuario, con idAsignacion e idEfector
         getAsignacionesSinAuditoria: (idUsuario, callback) => {
-            const sql = 'SELECT * FROM atenciones AS a WHERE a.idEfector IN (SELECT ae.idEfector FROM auditor_efector AS ae LEFT JOIN auditoria AS a ON ae.idEfector = a.idEfector LEFT JOIN auditoria_en_progreso AS ap ON ae.idEfector = ap.idEfector WHERE ae.idUsuario = ? AND a.idAuditoria IS NULL AND ap.idSerial IS NULL) ORDER BY `idAtencion` ASC';
+            const sql = `
+                SELECT a.*, e.RazonSocial
+                FROM atenciones AS a
+                JOIN efectores e ON a.idEfector = e.idEfector
+                WHERE a.idEfector IN (
+                    SELECT ae.idEfector
+                    FROM auditor_efector AS ae
+                    LEFT JOIN auditoria AS au ON ae.idEfector = au.idEfector
+                    LEFT JOIN auditoria_en_progreso AS ap ON ae.idEfector = ap.idEfector
+                    WHERE ae.idUsuario = ? AND au.idAuditoria IS NULL AND ap.idSerial IS NULL
+                )
+                ORDER BY a.idAtencion ASC
+            `;
             db.query(sql, [idUsuario], (err, results) => {
                 if (err) return callback(err);
                 callback(null, results);
