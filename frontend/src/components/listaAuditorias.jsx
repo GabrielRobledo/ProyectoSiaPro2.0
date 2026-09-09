@@ -38,6 +38,11 @@ export default function AuditoriasList() {
   const [ampliarGrafico, setAmpliarGrafico] = useState(null); 
   const { user } = useUser();
 
+  // 🛡️ PROTECCIÓN AQUÍ: Si el usuario todavía es null, muestra un mensaje de carga
+  if (!user) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando sesión...</div>;
+  }
+
   useEffect(() => {
     fetch(`${API_URL}/api/motivosTotales`)
       .then(res => res.json())
