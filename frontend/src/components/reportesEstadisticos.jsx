@@ -3,7 +3,7 @@ import axios from "axios";
 import API_URL from '../config';
 import { Bar } from 'react-chartjs-2';
 import { ChartComponent, SeriesCollectionDirective, SeriesDirective,
-         Inject, StackingAreaSeries, Category, Legend as SfLegend, Tooltip as SfTooltip, DataLabel, Chart3D } from '@syncfusion/ej2-react-charts';
+         Inject, AreaSeries, Category, Legend as SfLegend, Tooltip as SfTooltip, DataLabel, Chart3D } from '@syncfusion/ej2-react-charts';
 import { Dialog, IconButton } from "@mui/material";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import CloseIcon from "@mui/icons-material/Close";
@@ -340,7 +340,7 @@ const Reportes = () => {
             height="100%"
             legendSettings={{ visible: true }}
           >
-            <Inject services={[StackingAreaSeries, Category, SfLegend, SfTooltip, DataLabel, Chart3D]} />
+            <Inject services={[AreaSeries, Category, SfLegend, SfTooltip, DataLabel, Chart3D]} />
             <SeriesCollectionDirective>
               <SeriesDirective
                 dataSource={sf3dData}
@@ -348,7 +348,7 @@ const Reportes = () => {
                 yName="Facturado"
                 name="Facturado"
                 type="Area"
-                opacity={0.6}
+                opacity={0.4}
               />
               <SeriesDirective
                 dataSource={sf3dData}
@@ -356,7 +356,7 @@ const Reportes = () => {
                 yName="Debitado"
                 name="Debitado"
                 type="Area"
-                opacity={0.6}
+                opacity={0.4}
               />
             </SeriesCollectionDirective>
           </ChartComponent>
