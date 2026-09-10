@@ -14,7 +14,8 @@ import {
   Modal,
 } from 'antd';
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Breadcrumb } from 'antd';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import API_URL from '../config';
 import axios from 'axios';
 import Sidebar from './sidebar';
@@ -44,8 +45,27 @@ const BasicLayout = () => {
 
   const screens = useBreakpoint();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tablaSeleccionada, setTablaSeleccionada] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 🍞 Lógica para generar las migajas de pan de forma automática según la URL actual
+  const pathSnippets = location.pathname.split('/').filter((i) => i);
+  const extraBreadcrumbItems = pathSnippets.map((snippet, index) => {
+    const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
+    return (
+      <Breadcrumb.Item key={url}>
+        <Link to={url}>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</Link>
+      </Breadcrumb.Item>
+    );
+  });
+
+  const breadcrumbItems = [
+    <Breadcrumb.Item key="home">
+      <Link to="/">Inicio</Link>
+    </Breadcrumb.Item>,
+    ...extraBreadcrumbItems,
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -241,6 +261,10 @@ const BasicLayout = () => {
         </Header>
 
         <Content style={{ margin: '24px 0', background: '#fff', padding: 24 }}>
+          {/* 🍞 Migajas de pan integradas de forma limpia */}
+          <Breadcrumb style={{ marginBottom: '16px' }}>
+            {breadcrumbItems}
+          </Breadcrumb>
           <Outlet />
         </Content>
 

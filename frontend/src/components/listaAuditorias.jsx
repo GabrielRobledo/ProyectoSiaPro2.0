@@ -56,15 +56,24 @@ export default function AuditoriasList() {
       })
     .catch(err => Swal.fire('Error', err.message, 'error'));
     fetch(`${API_URL}/api/auditorias`)
-    .then(res => res.json())
-    .then(data => {
-      // Filtrar por usuario logueado
-      const { idUsuario } = user || {};
-      const filtradas = idUsuario ? data.filter(a => String(a.idUsuario) === String(idUsuario)) : data;
-      const sorted = filtradas.sort((a,b)=>b.idAuditoria - a.idAuditoria);
-      setAuditorias(sorted);
-      console.log('auditorias:', sorted); // <- Agregá esto
-    })
+      .then(res => res.json())
+      .then(data => {
+        const { idUsuario, rol } = user || {};
+        
+        // Normalizamos el rol para evitar problemas con mayúsculas, minúsculas o espacios
+        const rolNormalizado = rol?.toLowerCase().trim();
+        const esAdmin = rolNormalizado === 'administrador' || rolNormalizado === 'admin';
+        
+        // Si es admin ve todo, si es auditor filtra por su idUsuario
+        const filtradas = esAdmin 
+          ? data 
+          : data.filter(a => String(a.idUsuario) === String(idUsuario));
+          
+        const sorted = filtradas.sort((a, b) => b.idAuditoria - a.idAuditoria);
+        setAuditorias(sorted);
+        console.log('auditorias filtradas:', sorted);
+      })
+      .catch(err => Swal.fire('Error', err.message, 'error'));
   }, []);
 
   const auditoriaCerrada = (idEfector, periodo) => {
