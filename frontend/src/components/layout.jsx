@@ -60,12 +60,25 @@ const BasicLayout = () => {
     );
   });
 
-  const breadcrumbItems = [
-    <Breadcrumb.Item key="home">
-      <Link to="/">Inicio</Link>
-    </Breadcrumb.Item>,
-    ...extraBreadcrumbItems,
-  ];
+  // 🧭 Función para redirigir dinámicamente según el rol del usuario
+    const handleInicioClick = (e) => {
+      e.preventDefault();
+      const rol = user?.rol?.toLowerCase().trim();
+      if (rol === 'administrador') {
+        navigate('/dashboard');
+      } else if (rol === 'auditor') {
+        navigate('/dashboardAuditor');
+      } else {
+        navigate('/');
+      }
+    };
+
+    const breadcrumbItems = [
+      <Breadcrumb.Item key="home">
+        <a href="/" onClick={handleInicioClick}>Inicio</a>
+      </Breadcrumb.Item>,
+      ...extraBreadcrumbItems,
+    ];
 
   const handleLogout = () => {
     localStorage.removeItem('token');
