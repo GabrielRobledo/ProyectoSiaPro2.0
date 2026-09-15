@@ -1,15 +1,3 @@
-import subprocess
-import sys
-
-# Auto-instalar dependencias si no están presentes en el entorno de Render
-for package in ['pymysql', 'pandas', 'openpyxl']:
-  try:
-    __import__(package)
-  except ImportError:
-    subprocess.check_call(
-        [sys.executable, '-m', 'pip', 'install', package, '--user']
-    )
-
 import os
 from dotenv import load_dotenv
 import numpy as np
