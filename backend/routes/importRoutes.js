@@ -13,8 +13,11 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
     const scriptPath = path.join(__dirname, '../scripts/actualizar_db.py');
     const filePath = req.file.path;
 
-    // IMPORTANTE: Asegúrate de usar 'python' o 'python3' según tu sistema
-    const pythonProcess = spawn('python', [scriptPath, filePath]);
+    // Detectar automáticamente si estamos en Render (usa el venv) o en tu PC (usa python global)
+    const venvPython = path.join(__dirname, '../../venv/bin/python');
+    const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python';
+
+    const pythonProcess = spawn(pythonExecutable, [scriptPath, filePath]);
 
     let errorData = "";
 
@@ -29,7 +32,7 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
         if (code === 0) {
             res.status(200).json({ message: 'Proceso exitoso' });
         } else {
-            console.error("DETALLE DEL ERROR EN PYTHON:", errorData); // <--- MIRA TU TERMINAL DE NODE
+            console.error("DETALLE DEL ERROR EN PYTHON:", errorData);
             res.status(500).json({ 
                 error: 'Error en el script de Python', 
                 trace: errorData 
@@ -37,4 +40,5 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
         }
     });
 });
+
 module.exports = router;
