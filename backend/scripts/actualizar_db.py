@@ -1,9 +1,20 @@
+import subprocess
 import sys
-import pymysql
-import pandas as pd
-import numpy as np
+
+# Auto-instalar dependencias si no están presentes en el entorno de Render
+for package in ['pymysql', 'pandas', 'openpyxl']:
+  try:
+    __import__(package)
+  except ImportError:
+    subprocess.check_call(
+        [sys.executable, '-m', 'pip', 'install', package, '--user']
+    )
+
 import os
 from dotenv import load_dotenv
+import numpy as np
+import pandas as pd
+import pymysql
 
 load_dotenv()
 
@@ -11,7 +22,7 @@ load_dotenv()
 db = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),
     user=os.getenv('DB_USER', 'root'),
-    passwd=os.getenv('DB_PASSWORD', ''),
+    password=os.getenv('DB_PASSWORD', ''),
     db=os.getenv('DB_NAME', 'db_siap'),
     port=int(os.getenv('DB_PORT', 3306)),
     ssl={
