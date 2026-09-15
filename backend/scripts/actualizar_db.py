@@ -1,5 +1,5 @@
 import sys
-import MySQLdb
+import pymysql
 import pandas as pd
 import numpy as np
 import os
@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # CONEXIÓN CON MYSQL
-db = MySQLdb.connect(
+db = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),
     user=os.getenv('DB_USER', 'root'),
     passwd=os.getenv('DB_PASSWORD', ''),
