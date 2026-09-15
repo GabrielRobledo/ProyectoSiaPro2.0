@@ -1,5 +1,4 @@
 pymysql
 pandas
 openpyxl
-numpy
 python-dotenv
