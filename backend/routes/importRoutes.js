@@ -17,7 +17,9 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
     const venvPython = path.join(__dirname, '../../venv/bin/python');
     const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python';
 
-    const pythonProcess = spawn(pythonExecutable, [scriptPath, filePath]);
+    const pythonProcess = spawn(pythonExecutable, [scriptPath, filePath], {
+    env: process.env, // <--- Esto le pasa todas las credenciales de Render a Python
+    });
 
     let errorData = "";
 

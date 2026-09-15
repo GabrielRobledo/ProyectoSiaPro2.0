@@ -1,21 +1,19 @@
 import os
-from dotenv import load_dotenv
+import sys
 import numpy as np
 import pandas as pd
 import pymysql
 
-load_dotenv()
-
-# CONEXIÓN CON MYSQL
+# CONEXIÓN CON MYSQL (Leyendo directamente del entorno del sistema que le pasa Node)
 db = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),
     user=os.getenv('DB_USER', 'root'),
-    password=os.getenv('DB_PASSWORD', ''),
+    passwd=os.getenv('DB_PASSWORD', ''),
     db=os.getenv('DB_NAME', 'db_siap'),
     port=int(os.getenv('DB_PORT', 3306)),
     ssl={
-        "ssl": os.getenv('DB_SSL', 'false').lower() == 'true'
-    }
+        'ssl': os.getenv('DB_SSL', 'false').lower() == 'true',
+    },
 )
 cursor = db.cursor()
 print('CONEXIÓN EXITOSA')
