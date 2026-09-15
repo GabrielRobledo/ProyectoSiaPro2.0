@@ -14,7 +14,7 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
     const filePath = req.file.path;
 
     // Detectar automáticamente si estamos en Render (usa el venv) o en tu PC (usa python global)
-    const venvPython = path.join(__dirname, '../../venv/bin/python');
+    const venvPython = path.join(__dirname, '../venv/bin/python');
     const pythonExecutable = fs.existsSync(venvPython) ? venvPython : 'python';
 
     const pythonProcess = spawn(pythonExecutable, [scriptPath, filePath], {
