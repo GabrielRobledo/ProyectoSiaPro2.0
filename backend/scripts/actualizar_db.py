@@ -166,7 +166,7 @@ for index, row in df.iterrows():
 db.commit()
 print(f"Efectores nuevos agregados: {efe_count}")
 
-# 6. INSERTO ATENCIONES (Con garantía de que el Nomenclador ya existe)
+# 6. INSERTO ATENCIONES (Evitando duplicados si se corre el mismo período)
 print("Insertando Atenciones del período...")
 atn_count = 0
 for index, row in df.iterrows():
@@ -183,7 +183,6 @@ for index, row in df.iterrows():
     if not res_ben: continue
     idBen = res_ben[0]
 
-    # Ahora sí, al haberse procesado la Hoja3 primero, esto nunca fallará para las prácticas válidas
     cursor.execute("SELECT idNomenclador FROM Nomencladores WHERE codPractica = %s", (row.get("PRACTICA"),))
     res_nom = cursor.fetchone()
     if not res_nom: continue
@@ -200,14 +199,25 @@ for index, row in df.iterrows():
     raw_cant = row.get("CANT.", 1)
     cantidad = int(raw_cant) if not pd.isna(raw_cant) else 1
 
+    tipo_atn = str(row.get("tipoatencion", ""))
+    fecha_gral = str(row.get("FECHA_DE_PRESTACION", ""))
+    fecha_prac = str(row.get("F_PRACTICA", ""))
+
     if row.get("D_PRESTACION") == "PRACTICA MEDICA":
-        cursor.execute("""INSERT INTO Atenciones 
-                          (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                       (str(row.get("tipoatencion", "")), str(row.get("FECHA_DE_PRESTACION", "")), idBen, idNom, str(row.get("F_PRACTICA", "")),
-                        cantidad, valor_total, idEfec))
-        atn_count += 1
+        # VERIFICAR SI YA EXISTE LA ATENCIÓN PARA EVITAR DUPLICADOS
+        cursor.execute("""SELECT idAtencion FROM Atenciones 
+                          WHERE idBeneficiario = %s AND idNomenclador = %s AND idEfector = %s AND fechaPractica = %s""",
+                       (idBen, idNom, idEfec, fecha_prac))
+        
+        if cursor.fetchone() is None:
+            # Si no existe, la insertamos
+            cursor.execute("""INSERT INTO Atenciones 
+                              (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                           (tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
+            atn_count += 1
+
 db.commit()
-print(f"Atenciones nuevas insertadas: {atn_count}")
+print(f"Atenciones nuevas insertadas (sin duplicados): {atn_count}")
 
 print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')

@@ -41,6 +41,7 @@ const TablaBorradoresMui = () => {
   const rowsPerPage = 30;
   const [idSerial, setIdSerial] = useState(null);
   const navigate = useNavigate();
+  const [checkedRows, setCheckedRows] = useState({});
   
   const [visibleColumns, setVisibleColumns] = useState({
     idAtencion: true,
@@ -100,6 +101,15 @@ const TablaBorradoresMui = () => {
   const endIndex = startIndex + rowsPerPage;
   const paginatedData = filteredData.slice(startIndex, endIndex);
 
+  const formatearMoneda = (valor) => {
+    const numero = parseFloat(valor) || 0;
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numero);
+  };
 
   const handleRevisadoChange = (index) => {
     setDatos(prev =>
@@ -108,6 +118,22 @@ const TablaBorradoresMui = () => {
       )
     );
   };
+
+  const handleSelectAllChange = (e) => {
+      const isChecked = e.target.checked;
+      
+      // Obtenemos los IDs o filtramos los índices de los elementos actualmente visibles/filtrados
+      setDatos(prev =>
+        prev.map(item => {
+          // Comprobamos si el item actual está dentro de los filtrados actuales
+          const estaFiltrado = filteredData.some(f => f.idAtencion === item.idAtencion);
+          if (estaFiltrado) {
+            return { ...item, revisado: isChecked };
+          }
+          return item;
+        })
+      );
+    };
 
   const handleMotivoChange = (index, value) => {
     setDatos(prev =>
@@ -378,7 +404,7 @@ const handleGuardarProgreso = async () => {
               return (
                 <th key={key} style={{ ...thStyle, backgroundColor: '#b3e5fc' }}>
                   <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    Total: ${totalDebito.toFixed(2)}
+                    Total: {formatearMoneda(totalDebito)}
                   </span>
                 </th>
               );
@@ -386,11 +412,23 @@ const handleGuardarProgreso = async () => {
 
             if (key === 'revisado') {
               const totalRevisados = filteredData.filter(item => item.revisado).length;
+              // Evaluamos si todos los de la vista filtrada actual tienen revisado = true
+              const todosTildados = filteredData.length > 0 && filteredData.every(item => item.revisado);
+
               return (
                 <th key={key} style={{ ...thStyle, backgroundColor: '#b3e5fc' }}>
-                  <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    {totalRevisados} / {filteredData.length}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={todosTildados}
+                      onChange={handleSelectAllChange}
+                      title="Marcar / Desmarcar todos"
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
+                    <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                      {totalRevisados} / {filteredData.length}
+                    </span>
+                  </div>
                 </th>
               );
             }
@@ -434,7 +472,7 @@ const handleGuardarProgreso = async () => {
               {visibleColumns.codPractica && <td style={tdStyle}>{item.codPractica || '-'}</td>}
               {visibleColumns.fechaPractica && <td style={tdStyle}>{item.fechaPractica || '-'}</td>}
               {visibleColumns.cantidad && <td style={tdStyle}>{item.cantidad || '-'}</td>}
-              {visibleColumns.valorTotal && <td style={tdStyle}>{valorTotal.toFixed(2)}</td>}
+              {visibleColumns.valorTotal && <td style={tdStyle}>{formatearMoneda(valorTotal)}</td>}
               {visibleColumns.descripcion && <td style={tdStyle}>{item.descripcion || '-'}</td>}
               {visibleColumns.motivo_id && <td style={tdStyle}>{item.motivo_id || ''}</td>}
               {visibleColumns.debito && (
@@ -443,8 +481,8 @@ const handleGuardarProgreso = async () => {
                     type="number"
                     min="0"
                     max="1"
-                    step="0.5"
-                    value={debitoPercent.toFixed(1)|| ""}
+                    step="0.25"
+                    value={debitoPercent.toFixed(2)|| ""}
                     style={inputStyle}
                     onChange={(e) => handleDebitoChange(globalIndex, e.target.value)}
                   />
@@ -468,7 +506,7 @@ const handleGuardarProgreso = async () => {
                 </td>
               )}
               {visibleColumns.debitoCalculado && (
-                <td style={tdStyle}>${debito.toFixed(2)}</td>
+                <td style={tdStyle}>{formatearMoneda(debito)}</td>
               )}
               {visibleColumns.revisado && (
                 <td style={tdStyle}>

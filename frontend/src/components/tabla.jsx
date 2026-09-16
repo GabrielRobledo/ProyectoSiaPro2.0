@@ -104,6 +104,29 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
     setCheckedRows((prev) => ({ ...prev, [rowId]: isChecked }));
   };
 
+  const handleSelectAllChange = (e) => {
+    const isChecked = e.target.checked;
+    const nuevosChecks = { ...checkedRows };
+
+    // Iteramos solo sobre las filas filtradas actuales (las visibles en la paginación o en general)
+    filteredRows.forEach((row) => {
+      const rowKey = row.original.idAtencion;
+      nuevosChecks[rowKey] = isChecked;
+    });
+
+    setCheckedRows(nuevosChecks);
+  };
+
+  const formatearMoneda = (valor) => {
+    const numero = parseFloat(valor) || 0;
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numero);
+  };
+
   const handleMotivoChange = (rowKey, motivoId) => {
     console.log('Motivo seleccionado:', motivoId); // Aquí se recibe el ID del motivo
     setMotivosValues((prev) => ({
@@ -134,7 +157,13 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
       .map((key) => ({
         accessorKey: key,
         header: key,
-        cell: (info) => info.getValue(),
+        // Si la columna es valorTotal, formateamos el número como moneda
+        cell: (info) => {
+          if (key === 'valorTotal') {
+            return formatearMoneda(info.getValue());
+          }
+          return info.getValue();
+        },
         filterFn: "includesString",
         enableSorting: true,
       }));
@@ -148,7 +177,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
           cell: ({ row }) => (
             <input
               type="number"
-              step="0.5"
+              step="0.25"
               min="0"
               max="1"
 
@@ -183,30 +212,46 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
           },
           enableSorting: false,
         },
-
-
         {
           accessorKey: "__debito",
           header: "Débito $",
           cell: ({ row }) => {
-            const valorNumerico = parseFloat(inputValues[row.original.idAtencion]) || 0;
+            const rowKey = row.original.idAtencion;
+            const valorNumerico = parseFloat(inputValues[rowKey]) || 0;
             const importe = parseFloat(row.original.valorTotal) || 0;
             const debito = importe * valorNumerico;
-            return debito.toFixed(2);
+            return formatearMoneda(debito); // <--- Formateado aquí
           },
           enableSorting: false,
         },
         {
           accessorKey: "__revisado",
-          header: "Revisado",
-          cell: ({ row }) => (
-            <input
-              type="checkbox"
-              checked={!!checkedRows[row.original.idAtencion]}
-              onChange={(e) => handleCheckboxChange(row.original.idAtencion, e.target.checked)}
-              disabled
-            />
-          ),
+          header: () => {
+            // Verificamos si todos los filtrados actuales están tildados
+            const todosVisiblesTildados = filteredRows.length > 0 && filteredRows.every((row) => checkedRows[row.original.idAtencion]);
+            
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="checkbox"
+                  checked={todosVisiblesTildados}
+                  onChange={handleSelectAllChange}
+                  title="Marcar / Desmarcar todos los visibles"
+                />
+                <span>Revisado</span>
+              </div>
+            );
+          },
+          cell: ({ row }) => {
+            const rowKey = row.original.idAtencion;
+            return (
+              <input
+                type="checkbox"
+                checked={!!checkedRows[rowKey]}
+                onChange={(e) => handleCheckboxChange(rowKey, e.target.checked)}
+              />
+            );
+          },
           enableSorting: false,
         },
 
@@ -223,7 +268,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
             return (
               <input
                 type="number"
-                step="0.5"
+                step="0.25"
                 min="0"
                 max="1"
 
@@ -259,7 +304,6 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
           },
           enableSorting: false,
         },  
-
         {
           accessorKey: "__debito",
           header: "Débito $",
@@ -268,13 +312,28 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
             const valorNumerico = parseFloat(inputValues[rowKey]) || 0;
             const importe = parseFloat(row.original.valorTotal) || 0;
             const debito = importe * valorNumerico;
-            return debito.toFixed(2);
+            return formatearMoneda(debito); // <--- Formateado aquí
           },
           enableSorting: false,
         },
         {
           accessorKey: "__revisado",
-          header: "Revisado",
+          header: () => {
+            // Verificamos si todos los filtrados actuales están tildados
+            const todosVisiblesTildados = filteredRows.length > 0 && filteredRows.every((row) => checkedRows[row.original.idAtencion]);
+            
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <input
+                  type="checkbox"
+                  checked={todosVisiblesTildados}
+                  onChange={handleSelectAllChange}
+                  title="Marcar / Desmarcar todos los visibles"
+                />
+                <span>Revisado</span>
+              </div>
+            );
+          },
           cell: ({ row }) => {
             const rowKey = row.original.idAtencion;
             return (
@@ -286,7 +345,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
             );
           },
           enableSorting: false,
-        }
+        },
 
       ];
     }
@@ -727,7 +786,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
                     
                     {col.columnDef.header === 'Débito $' ? (
                       <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                        Total: ${totalDebito.toFixed(2)}
+                        Total: {formatearMoneda(totalDebito)}
                       </span>
                     ) : null}
                     {col.columnDef.header === "Revisado" ? (
