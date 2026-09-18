@@ -115,10 +115,6 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       </div>
     );
   }
-        <ListadoHospitales atenciones={Array.isArray(pendientes) ? pendientes : []} />
-      </div>
-    );
-  }
 
   // 📋 Vista principal de registros (listado o edición)
   return (
