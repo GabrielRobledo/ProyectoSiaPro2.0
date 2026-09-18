@@ -19,7 +19,7 @@ import {
   ListItemButton,
   ListItemText,
 } from '@mui/material';
-import { Delete as DeleteIcon, Add, Remove } from '@mui/icons-material';
+import { Delete as DeleteIcon, Add, Remove, TransferWithinAStation as TransferIcon } from '@mui/icons-material';
 import API_URL from '../config'
 
 const AsignarHospitales = () => {
@@ -30,50 +30,56 @@ const AsignarHospitales = () => {
   const [asignados, setAsignados] = useState([]);
   const [disponibles, setDisponibles] = useState([]);
   const [tabIndex, setTabIndex] = useState(0);
+  const [usuariosLibres, setUsuariosLibres] = useState([]);
 
-  const fetchData = async () => {
-    try {
-      const [usuariosRes, efectoresRes, asignacionesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/auth/usuarios`),
-        axios.get(`${API_URL}/api/efectores`),
-        axios.get(`${API_URL}/api/asignaciones`)
-      ]);
+const fetchData = async () => {
+  try {
+    const [usuariosRes, efectoresRes, asignacionesRes] = await Promise.all([
+      axios.get(`${API_URL}/api/auth/usuarios`),
+      axios.get(`${API_URL}/api/efectores`),
+      axios.get(`${API_URL}/api/asignaciones`)
+    ]);
 
-      const usuariosData = usuariosRes.data;
-      const efectoresData = efectoresRes.data;
-      const asignacionesData = asignacionesRes.data;
+    const usuariosData = usuariosRes.data;
+    const efectoresData = efectoresRes.data;
+    const asignacionesData = asignacionesRes.data;
 
-      const auditores = usuariosData.filter(u => u.tipoUsuario === 'auditor');
-      const auditoresAsignados = new Set(asignacionesData.map(a => a.idUsuario));
-      const efectoresAsignados = new Set(asignacionesData.map(a => a.idEfector));
+    const auditores = usuariosData.filter(u => u.tipoUsuario === 'auditor');
+    const auditoresAsignados = new Set(asignacionesData.map(a => a.idUsuario));
+    const efectoresAsignados = new Set(asignacionesData.map(a => a.idEfector));
 
-      setUsuarios(auditores.filter(a => !auditoresAsignados.has(a.idUsuario)));
-      setEfectores(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
-      setDisponibles(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
+    // 1. Guardamos TODOS los auditores para usarlos en la reasignación
+    setUsuarios(auditores); 
 
-      const asignacionesAgrupadas = auditores
-        .map(auditor => {
-          const hospitales = asignacionesData
-            .filter(a => a.idUsuario === auditor.idUsuario)
-            .map(a => {
-              const hosp = efectoresData.find(e => e.idEfector === a.idEfector);
-              return hosp ? hosp.RazonSocial : 'Hospital no encontrado';
-            });
+    // 2. Filtramos SOLO los libres para la pestaña de asignación inicial
+    setUsuariosLibres(auditores.filter(a => !auditoresAsignados.has(a.idUsuario)));
 
-          return {
-            idUsuario: auditor.idUsuario,
-            nombre: auditor.nombre,
-            hospitales
-          };
-        })
-        .filter(grupo => grupo.hospitales.length > 0);
+    setEfectores(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
+    setDisponibles(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
 
-      setAsignacionesTotales(asignacionesAgrupadas);
-    } catch (error) {
-      console.error(error);
-      Swal.fire('Error', 'No se pudo cargar la información.', 'error');
-    }
-  };
+    const asignacionesAgrupadas = auditores
+      .map(auditor => {
+        const hospitales = asignacionesData
+          .filter(a => a.idUsuario === auditor.idUsuario)
+          .map(a => {
+            const hosp = efectoresData.find(e => e.idEfector === a.idEfector);
+            return hosp ? hosp.RazonSocial : 'Hospital no encontrado';
+          });
+
+        return {
+          idUsuario: auditor.idUsuario,
+          nombre: auditor.nombre,
+          hospitales
+        };
+      })
+      .filter(grupo => grupo.hospitales.length > 0);
+
+    setAsignacionesTotales(asignacionesAgrupadas);
+  } catch (error) {
+    console.error(error);
+    Swal.fire('Error', 'No se pudo cargar la información.', 'error');
+  }
+};
 
   useEffect(() => {
     fetchData();
@@ -157,6 +163,7 @@ const AsignarHospitales = () => {
   };
 
 
+  // En AsignarUserHosp.jsx
   const eliminarAsignacion = (idUsuario) => {
     Swal.fire({
       title: '¿Estás seguro?',
@@ -175,12 +182,59 @@ const AsignarHospitales = () => {
             setAuditorId(null);
             setAsignados([]);
           })
-          .catch(() => {
-            Swal.fire('Error', 'No se pudo eliminar la asignación.', 'error');
+          .catch((error) => {
+            // 👈 Aquí capturamos el mensaje exacto que envía el backend
+            const mensajeError = error.response?.data?.msg || 'No se pudo eliminar la asignación.';
+            Swal.fire('Operación Denegada', mensajeError, 'error');
           });
       }
     });
   };
+
+
+  const abrirModalReasignar = async (grupoOrigen) => {
+    // Filtrar otros auditores disponibles (excluyendo al actual)
+    // Nota: podrías necesitar traer la lista completa de auditores activos
+    const auditoresDisponibles = usuarios.filter(u => u.idUsuario !== grupoOrigen.idUsuario);
+
+    if (auditoresDisponibles.length === 0) {
+      Swal.fire('Atención', 'No hay otros auditores disponibles para la reasignación.', 'warning');
+      return;
+    }
+
+    // Creamos un selector dinámico con SweetAlert2
+    const inputOptions = {};
+    auditoresDisponibles.forEach(aud => {
+      inputOptions[aud.idUsuario] = aud.nombre;
+    });
+
+    const { value: nuevoAuditorId } = await Swal.fire({
+      title: `Reasignar hospitales de ${grupoOrigen.nombre}`,
+      input: 'select',
+      inputOptions: inputOptions,
+      inputPlaceholder: 'Seleccioná el nuevo auditor',
+      showCancelButton: true,
+      confirmButtonText: 'Transferir',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (nuevoAuditorId) {
+      try {
+        // Llamada al backend para transferir
+        await axios.put(`${API_URL}/api/asignaciones/reasignar`, {
+          idUsuarioOrigen: grupoOrigen.idUsuario,
+          idUsuarioDestino: Number(nuevoAuditorId)
+        });
+
+        Swal.fire('¡Éxito!', 'Los hospitales fueron reasignados correctamente.', 'success');
+        fetchData();
+      } catch (error) {
+        const mensaje = error.response?.data?.message || 'No se pudo completar la reasignación.';
+        Swal.fire('Error', mensaje, 'error');
+      }
+    }
+  };
+  
 
   return (
     <Container maxWidth="md" sx={{ mt: 5, mb: 5 }}>
@@ -203,7 +257,7 @@ const AsignarHospitales = () => {
       {tabIndex === 0 && (
         <>
           <Autocomplete
-            options={usuarios}
+            options={usuariosLibres}
             getOptionLabel={(option) => option.nombre}
             value={usuarios.find(u => u.idUsuario === auditorId) || null}
             onChange={(_, newValue) => setAuditorId(newValue ? newValue.idUsuario : null)}
@@ -304,21 +358,30 @@ const AsignarHospitales = () => {
         </>
       )}
 
-      {tabIndex === 1 && (
-        <List sx={{ maxHeight: 600, overflowY: 'auto' }}>
-          {asignacionesTotales.map((grupo) => (
-            <ListItemButton key={grupo.idUsuario} sx={{ mb: 1 }}>
-              <ListItemText
-                primary={grupo.nombre}
-                secondary={grupo.hospitales.join(', ')}
-              />
-              <IconButton edge="end" onClick={() => eliminarAsignacion(grupo.idUsuario)}>
-                <DeleteIcon />
-              </IconButton>
-            </ListItemButton>
-          ))}
-        </List>
-      )}
+    {tabIndex === 1 && (
+      <List sx={{ maxHeight: 600, overflowY: 'auto' }}>
+        {asignacionesTotales.map((grupo) => (
+          <ListItemButton key={grupo.idUsuario} sx={{ mb: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+            <ListItemText
+              primary={grupo.nombre}
+              secondary={`Hospitales: ${grupo.hospitales.join(', ')}`}
+            />
+            <Stack direction="row" spacing={1}>
+              <Tooltip title="Reasignar hospitales a otro auditor">
+                <IconButton edge="end" color="primary" onClick={() => abrirModalReasignar(grupo)}>
+                  <TransferIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Eliminar asignaciones">
+                <IconButton edge="end" color="error" onClick={() => eliminarAsignacion(grupo.idUsuario)}>
+                  <DeleteIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </ListItemButton>
+        ))}
+      </List>
+    )}
     </Container>
   );
 };

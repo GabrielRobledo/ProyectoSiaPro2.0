@@ -8,7 +8,7 @@ router.get('/asignaciones', asignacionController.obtenerTodasAsignaciones);
 router.delete('/asignaciones/:idUsuario', asignacionController.eliminarAsignacion);
 router.get('/asignaciones-sin-auditoria/:idUsuario', asignacionController.ObtenerAsignacionesSinAuditoria);
 router.get('/auditorias-en-progreso/:idUsuario', asignacionController.obtenerAuditoriasEnProgreso);
-
+router.put('/asignaciones/reasignar', asignacionController.reasignarAuditor);
 
 
 module.exports = router;

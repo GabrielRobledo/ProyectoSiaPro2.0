@@ -14,12 +14,12 @@ const ListadoHospitales = ({ atenciones }) => {
     const resumen = {};
     const tiposSet = new Set();
 
-    atenciones.forEach(({ RazonSocial, tipoAtencion, idEfector }) => {
+    atenciones.forEach(({ RazonSocial, tipoAtencion, idEfector, reasignado }) => {
       if (!idEfector) return;
       tiposSet.add(tipoAtencion);
 
       if (!resumen[idEfector]) {
-        resumen[idEfector] = { RazonSocial, conteos: {} };
+        resumen[idEfector] = { RazonSocial, conteos: {}, reasignado: Boolean(reasignado) };
       }
 
       if (!resumen[idEfector].conteos[tipoAtencion]) {
@@ -45,13 +45,28 @@ const ListadoHospitales = ({ atenciones }) => {
 
   return (
     <div className="cards-grid">
-      {Object.entries(resumen).map(([idEfector, { RazonSocial, conteos }]) => (
+      {Object.entries(resumen).map(([idEfector, { RazonSocial, conteos, reasignado }]) => (
         <div
           key={idEfector}
-          className="card"
+          className={`card ${reasignado ? 'card-reasignado' : ''}`}
           onClick={() => handleClickHospital(idEfector)}
-          style={{ cursor: esAuditor ? 'pointer' : 'not-allowed', opacity: esAuditor ? 1 : 0.7 }}
+          style={{ cursor: esAuditor ? 'pointer' : 'not-allowed', opacity: esAuditor ? 1 : 0.7, borderLeft: reasignado ? '5px solid #ff9800' : 'none' }}
         >
+          {reasignado && (
+            <span className="badge-reasignado" style={{
+              backgroundColor: '#ff9800',
+              color: '#fff',
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontWeight: 'bold'
+            }}>
+              Reasignado
+            </span>
+          )}
           <div className="card-header">
             <div className="card-icon">
               <LocalHospitalIcon />

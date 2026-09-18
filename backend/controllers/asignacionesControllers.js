@@ -42,11 +42,33 @@ exports.obtenerEfectoresPorAuditor = (req, res) => {
 
 exports.eliminarAsignacion = (req, res) => {
   const { idUsuario } = req.params;
-  db.query('DELETE FROM auditor_efector WHERE idUsuario = ?', [idUsuario], (err, result) => {
+
+  // 1. Validar si el auditor tiene auditorías en progreso o borradores
+  const sqlValidacion = 'SELECT COUNT(*) AS total FROM auditoria_en_progreso WHERE idUsuario = ?';
+
+  db.query(sqlValidacion, [idUsuario], (err, results) => {
     if (err) {
-      return res.status(500).json({ msg: 'Error al eliminar asignaciones', error: err });
+      console.error('Error al validar borradores:', err);
+      return res.status(500).json({ msg: 'Error al verificar el estado del auditor' });
     }
-    res.json({ msg: 'Asignaciones eliminadas correctamente' });
+
+    const totalBorradores = results[0].total;
+
+    // Si tiene borradores/progreso, BLOQUEAMOS la eliminación
+    if (totalBorradores > 0) {
+      return res.status(400).json({ 
+        msg: 'No se puede eliminar la asignación porque el auditor posee auditorías en curso o borradores. Utilice la opción de reasignación.' 
+      });
+    }
+
+    // 2. Si no tiene borradores, procedemos a eliminar las asignaciones de hospitales
+    db.query('DELETE FROM auditor_efector WHERE idUsuario = ?', [idUsuario], (errDel, result) => {
+      if (errDel) {
+        console.error('Error al eliminar asignaciones:', errDel);
+        return res.status(500).json({ msg: 'Error al eliminar asignaciones' });
+      }
+      res.json({ msg: 'Asignaciones eliminadas correctamente' });
+    });
   });
 };
 
@@ -85,3 +107,60 @@ exports.obtenerAuditoriasEnProgreso = (req, res) => {
     res.json(auditorias);
   });
 }
+
+// Reasignar hospitales y auditorías en progreso de un auditor a otro
+exports.reasignarAuditor = (req, res) => {
+  const { idUsuarioOrigen, idUsuarioDestino } = req.body;
+
+  if (!idUsuarioOrigen || !idUsuarioDestino) {
+    return res.status(400).json({ msg: 'Faltan datos obligatorios (origen o destino)' });
+  }
+
+  // Iniciamos una transacción para garantizar atomicidad
+  db.beginTransaction((err) => {
+    if (err) {
+      console.error('Error al iniciar transacción:', err);
+      return res.status(500).json({ msg: 'Error interno en el servidor' });
+    }
+
+    // 1. Reasignar los hospitales en la tabla de relación (auditor_efector)
+    const sqlEfectores = 'UPDATE auditor_efector SET idUsuario = ?, reasignado = 1 WHERE idUsuario = ?';
+    
+    db.query(sqlEfectores, [idUsuarioDestino, idUsuarioOrigen], (err, resultEfectores) => {
+      if (err) {
+        return db.rollback(() => {
+          console.error('Error al reasignar efectores:', err);
+          res.status(500).json({ msg: 'Error al reasignar los hospitales' });
+        });
+      }
+
+      // 2. Reasignar los borradores en curso (auditoria_en_progreso)
+      const sqlProgreso = 'UPDATE auditoria_en_progreso SET idUsuario = ? WHERE idUsuario = ?';
+
+      db.query(sqlProgreso, [idUsuarioDestino, idUsuarioOrigen], (err2, resultProgreso) => {
+        if (err2) {
+          return db.rollback(() => {
+            console.error('Error al reasignar auditorías en progreso:', err2);
+            res.status(500).json({ msg: 'Error al reasignar los borradores en curso' });
+          });
+        }
+
+        // Si todo sale bien, confirmamos la transacción
+        db.commit((err3) => {
+          if (err3) {
+            return db.rollback(() => {
+              console.error('Error al hacer commit:', err3);
+              res.status(500).json({ msg: 'Error al confirmar la reasignación' });
+            });
+          }
+
+          res.json({ 
+            msg: 'Reasignación completada con éxito',
+            efectoresActualizados: resultEfectores.affectedRows,
+            borradoresActualizados: resultProgreso.affectedRows
+          });
+        });
+      });
+    });
+  });
+};

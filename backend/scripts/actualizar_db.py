@@ -37,29 +37,29 @@ except Exception as e:
     sys.exit(1)
 
 # 1. VERIFICAR / CREAR TABLAS PRINCIPALES
-cursor.execute("""CREATE TABLE IF NOT EXISTS Modulos(
+cursor.execute("""CREATE TABLE IF NOT EXISTS modulos(
                     idModulo int primary key,
                     descripcion varchar(100) not null);""")
 
-cursor.execute("""CREATE TABLE IF NOT EXISTS Beneficiarios(
+cursor.execute("""CREATE TABLE IF NOT EXISTS beneficiarios(
                     idBeneficiario int AUTO_INCREMENT primary key,
                     apeYnom varchar(100) not null,
                     NroBeneficiario varchar(50) not null);""")
 
-cursor.execute("""CREATE TABLE IF NOT EXISTS Efectores(
+cursor.execute("""CREATE TABLE IF NOT EXISTS efectores(
                     idEfector int AUTO_INCREMENT primary key,
                     codPrestador varchar(10) not null,
                     RazonSocial varchar(100) not null);""")
 
-cursor.execute("""CREATE TABLE IF NOT EXISTS Nomencladores(
+cursor.execute("""CREATE TABLE IF NOT EXISTS nomencladores(
                     idNomenclador int auto_increment primary key,
                     codPractica int not null,
                     descripcion varchar(100) not null,
                     valorGeneral double(20,2) not null,
                     idModulo int not null,
-                    FOREIGN KEY(idModulo) REFERENCES Modulos(idModulo));""")
+                    FOREIGN KEY(idModulo) REFERENCES modulos(idModulo));""")
 
-cursor.execute("""CREATE TABLE IF NOT EXISTS Atenciones(
+cursor.execute("""CREATE TABLE IF NOT EXISTS atenciones(
                     idAtencion int auto_increment primary key,
                     tipoAtencion varchar(50) not null,
                     fecha varchar(50) not null,
@@ -69,9 +69,9 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS Atenciones(
                     cantidad int,
                     valorTotal double(20,2),
                     idEfector int not null,
-                    FOREIGN KEY(idBeneficiario) REFERENCES Beneficiarios(idBeneficiario),
-                    FOREIGN KEY(idNomenclador) REFERENCES Nomencladores(idNomenclador),
-                    FOREIGN KEY(idEfector) REFERENCES Efectores(idEfector));""")
+                    FOREIGN KEY(idBeneficiario) REFERENCES beneficiarios(idBeneficiario),
+                    FOREIGN KEY(idNomenclador) REFERENCES nomencladores(idNomenclador),
+                    FOREIGN KEY(idEfector) REFERENCES efectores(idEfector));""")
 print("Tablas verificadas/creadas correctamente.")
 
 # 2. PROCESAR MÓDULOS (Desde la Hoja 1 y Hoja 3)
@@ -87,12 +87,12 @@ for _, row in dfNomen.dropna(subset=["modulo"]).iterrows():
     except: pass
 
 for mod_id in modulos_ids:
-    cursor.execute("SELECT idModulo FROM Modulos WHERE idModulo = %s", (mod_id,))
+    cursor.execute("SELECT idModulo FROM modulos WHERE idModulo = %s", (mod_id,))
     if cursor.fetchone() is None:
         # Buscamos la descripción en el df
         match_desc = df[df["MODULO"] == mod_id]["NOMBRE_MODULO"]
         desc_mod = str(match_desc.values[0]) if not match_desc.empty else f"Módulo {mod_id}"
-        cursor.execute("INSERT INTO Modulos (idModulo, descripcion) VALUES (%s, %s)", (mod_id, desc_mod))
+        cursor.execute("INSERT INTO modulos (idModulo, descripcion) VALUES (%s, %s)", (mod_id, desc_mod))
         mod_count += 1
 db.commit()
 print(f"Módulos nuevos sincronizados: {mod_count}")
@@ -116,18 +116,18 @@ for index, row in dfNomen.iterrows():
     valor_gen = float(raw_val) if not pd.isna(raw_val) else 0.0
 
     # Verificamos si la práctica ya existe para actualizar su valor o insertarla si es nueva
-    cursor.execute("SELECT idNomenclador, valorGeneral FROM Nomencladores WHERE codPractica = %s AND idModulo = %s", (cod_prac, mod_id))
+    cursor.execute("SELECT idNomenclador, valorGeneral FROM nomencladores WHERE codPractica = %s AND idModulo = %s", (cod_prac, mod_id))
     res_nom = cursor.fetchone()
     
     if res_nom is None:
         # Insertamos si no existe
-        cursor.execute("""INSERT INTO Nomencladores (codPractica, descripcion, valorGeneral, idModulo) 
+        cursor.execute("""INSERT INTO nomencladores (codPractica, descripcion, valorGeneral, idModulo) 
                           VALUES (%s, %s, %s, %s)""", 
                        (cod_prac, descripcion, valor_gen, mod_id))
         nom_count += 1
     else:
         # Si ya existe, actualizamos su valor por si cambió en este nuevo período
-        cursor.execute("UPDATE Nomencladores SET valorGeneral = %s, descripcion = %s WHERE idNomenclador = %s", 
+        cursor.execute("UPDATE nomencladores SET valorGeneral = %s, descripcion = %s WHERE idNomenclador = %s", 
                        (valor_gen, descripcion, res_nom[0]))
 db.commit()
 print(f"Nomencladores procesados (Nuevos/Actualizados): {nom_count}")
@@ -143,9 +143,9 @@ for index, row in df.iterrows():
     except:
         continue
         
-    cursor.execute("SELECT idBeneficiario FROM Beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
+    cursor.execute("SELECT idBeneficiario FROM beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
     if cursor.fetchone() is None:
-        cursor.execute("INSERT INTO Beneficiarios (apeYnom, NroBeneficiario) VALUES (%s, %s)", 
+        cursor.execute("INSERT INTO beneficiarios (apeYnom, NroBeneficiario) VALUES (%s, %s)", 
                        (str(row["APELLIDO_Y_NOMBRE"]), nrobene))
         ben_count += 1
 db.commit()
@@ -158,9 +158,9 @@ for index, row in df.iterrows():
     cod_pres = row.get("cod")
     if pd.isna(cod_pres): continue
     
-    cursor.execute("SELECT idEfector FROM Efectores WHERE codPrestador = %s", (str(cod_pres),))
+    cursor.execute("SELECT idEfector FROM efectores WHERE codPrestador = %s", (str(cod_pres),))
     if cursor.fetchone() is None:
-        cursor.execute("INSERT INTO Efectores (codPrestador, RazonSocial) VALUES (%s, %s)", 
+        cursor.execute("INSERT INTO efectores (codPrestador, RazonSocial) VALUES (%s, %s)", 
                        (str(cod_pres), str(row.get("Efector", "Sin nombre"))))
         efe_count += 1
 db.commit()
@@ -178,17 +178,17 @@ for index, row in df.iterrows():
     except:
         continue
 
-    cursor.execute("SELECT idBeneficiario FROM Beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
+    cursor.execute("SELECT idBeneficiario FROM beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
     res_ben = cursor.fetchone()
     if not res_ben: continue
     idBen = res_ben[0]
 
-    cursor.execute("SELECT idNomenclador FROM Nomencladores WHERE codPractica = %s", (row.get("PRACTICA"),))
+    cursor.execute("SELECT idNomenclador FROM nomencladores WHERE codPractica = %s", (row.get("PRACTICA"),))
     res_nom = cursor.fetchone()
     if not res_nom: continue
     idNom = res_nom[0]
 
-    cursor.execute("SELECT idEfector FROM Efectores WHERE codPrestador = %s", (str(row.get("cod")),))
+    cursor.execute("SELECT idEfector FROM efectores WHERE codPrestador = %s", (str(row.get("cod")),))
     res_efe = cursor.fetchone()
     if not res_efe: continue
     idEfec = res_efe[0]
@@ -205,13 +205,13 @@ for index, row in df.iterrows():
 
     if row.get("D_PRESTACION") == "PRACTICA MEDICA":
         # VERIFICAR SI YA EXISTE LA ATENCIÓN PARA EVITAR DUPLICADOS
-        cursor.execute("""SELECT idAtencion FROM Atenciones 
+        cursor.execute("""SELECT idAtencion FROM atenciones 
                           WHERE idBeneficiario = %s AND idNomenclador = %s AND idEfector = %s AND fechaPractica = %s""",
                        (idBen, idNom, idEfec, fecha_prac))
         
         if cursor.fetchone() is None:
             # Si no existe, la insertamos
-            cursor.execute("""INSERT INTO Atenciones 
+            cursor.execute("""INSERT INTO atenciones 
                               (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                            (tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
