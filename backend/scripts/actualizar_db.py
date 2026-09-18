@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 import pymysql
 
-# CONEXIÓN CON MYSQL (Leyendo directamente del entorno del sistema que le pasa Node)
+# CONEXIÓN CON MYSQL
 db = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),
     user=os.getenv('DB_USER', 'root'),
@@ -17,7 +17,6 @@ db = pymysql.connect(
 cursor = db.cursor()
 print('CONEXIÓN EXITOSA')
 
-# OBTENER RUTA DEL EXCEL
 if len(sys.argv) > 1:
     file_path = sys.argv[1]
 else:
@@ -27,19 +26,17 @@ print(f"Procesando archivo mensual: {file_path}")
 
 try:
     df = pd.read_excel(file_path, sheet_name='Hoja1')
-    # Hoja3 con los nomencladores y montos del período actual 
     dfNomen = pd.read_excel(file_path, sheet_name='Hoja3', header=0)
-    
     print(f"Filas de atenciones en Hoja1: {len(df)}")
     print(f"Filas de nomencladores en Hoja3: {len(dfNomen)}")
 except Exception as e:
     print(f"Error al leer las hojas del Excel: {e}")
     sys.exit(1)
 
-# 1. VERIFICAR / CREAR TABLAS PRINCIPALES
+# 1. VERIFICAR / CREAR TABLAS PRINCIPALES (con la columna descripcion en TEXT para evitar desbordamientos)
 cursor.execute("""CREATE TABLE IF NOT EXISTS modulos(
                     idModulo int primary key,
-                    descripcion varchar(100) not null);""")
+                    descripcion text not null);""")
 
 cursor.execute("""CREATE TABLE IF NOT EXISTS beneficiarios(
                     idBeneficiario int AUTO_INCREMENT primary key,
@@ -54,7 +51,7 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS efectores(
 cursor.execute("""CREATE TABLE IF NOT EXISTS nomencladores(
                     idNomenclador int auto_increment primary key,
                     codPractica int not null,
-                    descripcion varchar(100) not null,
+                    descripcion text not null,
                     valorGeneral double(20,2) not null,
                     idModulo int not null,
                     FOREIGN KEY(idModulo) REFERENCES modulos(idModulo));""")
@@ -72,12 +69,13 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS atenciones(
                     FOREIGN KEY(idBeneficiario) REFERENCES beneficiarios(idBeneficiario),
                     FOREIGN KEY(idNomenclador) REFERENCES nomencladores(idNomenclador),
                     FOREIGN KEY(idEfector) REFERENCES efectores(idEfector));""")
+db.commit()
 print("Tablas verificadas/creadas correctamente.")
 
-# 2. PROCESAR MÓDULOS (Desde la Hoja 1 y Hoja 3)
-print("Sincronizando Módulos...")
-mod_count = 0
-# Extraemos módulos únicos de ambas hojas para asegurar cobertura total
+# 2. SINCRONIZAR MÓDULOS EN LOTE
+cursor.execute("SELECT idModulo FROM modulos")
+modulos_existentes = {row[0] for row in cursor.fetchall()}
+
 modulos_ids = set()
 for _, row in df.dropna(subset=["MODULO"]).iterrows():
     try: modulos_ids.add(int(row["MODULO"]))
@@ -86,90 +84,110 @@ for _, row in dfNomen.dropna(subset=["modulo"]).iterrows():
     try: modulos_ids.add(int(row["modulo"]))
     except: pass
 
+nuevos_modulos = []
 for mod_id in modulos_ids:
-    cursor.execute("SELECT idModulo FROM modulos WHERE idModulo = %s", (mod_id,))
-    if cursor.fetchone() is None:
-        # Buscamos la descripción en el df
+    if mod_id not in modulos_existentes:
         match_desc = df[df["MODULO"] == mod_id]["NOMBRE_MODULO"]
         desc_mod = str(match_desc.values[0]) if not match_desc.empty else f"Módulo {mod_id}"
-        cursor.execute("INSERT INTO modulos (idModulo, descripcion) VALUES (%s, %s)", (mod_id, desc_mod))
-        mod_count += 1
-db.commit()
-print(f"Módulos nuevos sincronizados: {mod_count}")
+        nuevos_modulos.append((mod_id, desc_mod))
 
-# 3. PROCESAR NOMENCLADORES DEL PERÍODO (Hoja 3 PRIMERO)
-print("Actualizando/Insertando Nomencladores del período...")
-nom_count = 0
-for index, row in dfNomen.iterrows():
-    cod_prac_val = row.get("codPractica")
-    if pd.isna(cod_prac_val): continue
-    try: cod_prac = int(cod_prac_val)
-    except: continue
+if nuevos_modulos:
+    cursor.executemany("INSERT INTO modulos (idModulo, descripcion) VALUES (%s, %s)", nuevos_modulos)
+    db.commit()
+print(f"Módulos nuevos sincronizados: {len(nuevos_modulos)}")
 
-    mod_val = row.get("modulo")
-    if pd.isna(mod_val): continue
-    try: mod_id = int(mod_val)
-    except: continue
+# 3. PROCESAR NOMENCLADORES EN LOTE
+cursor.execute("SELECT codPractica, idModulo, idNomenclador FROM nomencladores")
+nomencladores_db = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+
+a_insertar_nom = []
+a_actualizar_nom = []
+
+for _, row in dfNomen.iterrows():
+    try:
+        cod_prac = int(row.get("codPractica"))
+        mod_id = int(row.get("modulo"))
+    except:
+        continue
 
     descripcion = str(row.get("DescripcionPractica", "Sin descripción")).replace('"', '')
     raw_val = row.get("Valor GENERAL", 0.0)
     valor_gen = float(raw_val) if not pd.isna(raw_val) else 0.0
 
-    # Verificamos si la práctica ya existe para actualizar su valor o insertarla si es nueva
-    cursor.execute("SELECT idNomenclador, valorGeneral FROM nomencladores WHERE codPractica = %s AND idModulo = %s", (cod_prac, mod_id))
-    res_nom = cursor.fetchone()
-    
-    if res_nom is None:
-        # Insertamos si no existe
-        cursor.execute("""INSERT INTO nomencladores (codPractica, descripcion, valorGeneral, idModulo) 
-                          VALUES (%s, %s, %s, %s)""", 
-                       (cod_prac, descripcion, valor_gen, mod_id))
-        nom_count += 1
+    key = (cod_prac, mod_id)
+    if key not in nomencladores_db:
+        a_insertar_nom.append((cod_prac, descripcion, valor_gen, mod_id))
     else:
-        # Si ya existe, actualizamos su valor por si cambió en este nuevo período
-        cursor.execute("UPDATE nomencladores SET valorGeneral = %s, descripcion = %s WHERE idNomenclador = %s", 
-                       (valor_gen, descripcion, res_nom[0]))
-db.commit()
-print(f"Nomencladores procesados (Nuevos/Actualizados): {nom_count}")
+        id_nom = nomencladores_db[key]
+        a_actualizar_nom.append((valor_gen, descripcion, id_nom))
 
-# 4. PROCESAR BENEFICIARIOS (Acumulativos)
-print("Procesando Beneficiarios...")
-ben_count = 0
-for index, row in df.iterrows():
+if a_insertar_nom:
+    cursor.executemany("""INSERT INTO nomencladores (codPractica, descripcion, valorGeneral, idModulo) 
+                          VALUES (%s, %s, %s, %s)""", a_insertar_nom)
+if a_actualizar_nom:
+    cursor.executemany("""UPDATE nomencladores SET valorGeneral = %s, descripcion = %s 
+                          WHERE idNomenclador = %s""", a_actualizar_nom)
+db.commit()
+print(f"Nomencladores insertados: {len(a_insertar_nom)}, actualizados: {len(a_actualizar_nom)}")
+
+# 4. PROCESAR BENEFICIARIOS EN LOTE
+cursor.execute("SELECT NroBeneficiario FROM beneficiarios")
+beneficiarios_db = {row[0] for row in cursor.fetchall()}
+
+nuevos_beneficiarios = []
+for _, row in df.iterrows():
     if pd.isna(row.get("NRO_BENEFICIO")) or pd.isna(row.get("GRADO_PARENTESCO")):
         continue
     try:
         nrobene = str(int(row["NRO_BENEFICIO"])) + "-0" + str(int(row["GRADO_PARENTESCO"]))
     except:
         continue
-        
-    cursor.execute("SELECT idBeneficiario FROM beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
-    if cursor.fetchone() is None:
-        cursor.execute("INSERT INTO beneficiarios (apeYnom, NroBeneficiario) VALUES (%s, %s)", 
-                       (str(row["APELLIDO_Y_NOMBRE"]), nrobene))
-        ben_count += 1
-db.commit()
-print(f"Beneficiarios nuevos agregados: {ben_count}")
+    
+    if nrobene not in beneficiarios_db:
+        beneficiarios_db.add(nrobene) # Evitar duplicados dentro del mismo excel
+        nuevos_beneficiarios.append((str(row["APELLIDO_Y_NOMBRE"]), nrobene))
 
-# 5. PROCESAR EFECTORES (Acumulativos)
-print("Procesando Efectores...")
-efe_count = 0
-for index, row in df.iterrows():
+if nuevos_beneficiarios:
+    cursor.executemany("INSERT INTO beneficiarios (apeYnom, NroBeneficiario) VALUES (%s, %s)", nuevos_beneficiarios)
+    db.commit()
+print(f"Beneficiarios nuevos agregados: {len(nuevos_beneficiarios)}")
+
+# 5. PROCESAR EFECTORES EN LOTE
+cursor.execute("SELECT codPrestador FROM efectores")
+efectores_db = {row[0] for row in cursor.fetchall()}
+
+nuevos_efectores = []
+for _, row in df.iterrows():
     cod_pres = row.get("cod")
     if pd.isna(cod_pres): continue
+    cod_str = str(cod_pres)
     
-    cursor.execute("SELECT idEfector FROM efectores WHERE codPrestador = %s", (str(cod_pres),))
-    if cursor.fetchone() is None:
-        cursor.execute("INSERT INTO efectores (codPrestador, RazonSocial) VALUES (%s, %s)", 
-                       (str(cod_pres), str(row.get("Efector", "Sin nombre"))))
-        efe_count += 1
-db.commit()
-print(f"Efectores nuevos agregados: {efe_count}")
+    if cod_str not in efectores_db:
+        efectores_db.add(cod_str)
+        nuevos_efectores.append((cod_str, str(row.get("Efector", "Sin nombre"))))
 
-# 6. INSERTO ATENCIONES (Evitando duplicados si se corre el mismo período)
-print("Insertando Atenciones del período...")
-atn_count = 0
-for index, row in df.iterrows():
+if nuevos_efectores:
+    cursor.executemany("INSERT INTO efectores (codPrestador, RazonSocial) VALUES (%s, %s)", nuevos_efectores)
+    db.commit()
+print(f"Efectores nuevos agregados: {len(nuevos_efectores)}")
+
+# RECARGAR DICCIONARIOS DE MAPEO PARA LAS ATENCIONES
+cursor.execute("SELECT NroBeneficiario, idBeneficiario FROM beneficiarios")
+map_beneficiarios = {row[0]: row[1] for row in cursor.fetchall()}
+
+cursor.execute("SELECT codPractica, idModulo, idNomenclador FROM nomencladores")
+map_nomencladores = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+
+cursor.execute("SELECT codPrestador, idEfector FROM efectores")
+map_efectores = {str(row[0]): row[1] for row in cursor.fetchall()}
+
+# 6. INSERTAR ATENCIONES EN LOTE
+print("Preparando e insertando Atenciones del período...")
+atenciones_a_insertar = []
+
+for _, row in df.iterrows():
+    if row.get("D_PRESTACION") != "PRACTICA MEDICA":
+        continue
     if pd.isna(row.get("NRO_BENEFICIO")) or pd.isna(row.get("GRADO_PARENTESCO")):
         continue
     
@@ -178,20 +196,21 @@ for index, row in df.iterrows():
     except:
         continue
 
-    cursor.execute("SELECT idBeneficiario FROM beneficiarios WHERE NroBeneficiario = %s", (nrobene,))
-    res_ben = cursor.fetchone()
-    if not res_ben: continue
-    idBen = res_ben[0]
+    idBen = map_beneficiarios.get(nrobene)
+    if not idBen: continue
 
-    cursor.execute("SELECT idNomenclador FROM nomencladores WHERE codPractica = %s", (row.get("PRACTICA"),))
-    res_nom = cursor.fetchone()
-    if not res_nom: continue
-    idNom = res_nom[0]
+    # Nota: si necesitás el idModulo para buscar el nomenclador, asegurate de tenerlo mapeado, 
+    # aquí buscamos por codPractica o usando el módulo correspondiente de la fila
+    try:
+        mod_id = int(row["MODULO"])
+        cod_prac = int(row["PRACTICA"])
+        idNom = map_nomencladores.get((cod_prac, mod_id))
+    except:
+        idNom = None
+    if not idNom: continue
 
-    cursor.execute("SELECT idEfector FROM efectores WHERE codPrestador = %s", (str(row.get("cod")),))
-    res_efe = cursor.fetchone()
-    if not res_efe: continue
-    idEfec = res_efe[0]
+    idEfec = map_efectores.get(str(row.get("cod")))
+    if not idEfec: continue
 
     raw_valor_total = row.get("Valor Total", 0)
     valor_total = float(raw_valor_total) if not pd.isna(raw_valor_total) else 0.0
@@ -203,21 +222,14 @@ for index, row in df.iterrows():
     fecha_gral = str(row.get("FECHA_DE_PRESTACION", ""))
     fecha_prac = str(row.get("F_PRACTICA", ""))
 
-    if row.get("D_PRESTACION") == "PRACTICA MEDICA":
-        # VERIFICAR SI YA EXISTE LA ATENCIÓN PARA EVITAR DUPLICADOS
-        cursor.execute("""SELECT idAtencion FROM atenciones 
-                          WHERE idBeneficiario = %s AND idNomenclador = %s AND idEfector = %s AND fechaPractica = %s""",
-                       (idBen, idNom, idEfec, fecha_prac))
-        
-        if cursor.fetchone() is None:
-            # Si no existe, la insertamos
-            cursor.execute("""INSERT INTO atenciones 
-                              (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                           (tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
-            atn_count += 1
+    atenciones_a_insertar.append((tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
 
-db.commit()
-print(f"Atenciones nuevas insertadas (sin duplicados): {atn_count}")
+# Insertar masivamente en bloques usando executemany
+if atenciones_a_insertar:
+    cursor.executemany("""INSERT INTO atenciones 
+                          (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
+    db.commit()
 
+print(f"Atenciones nuevas insertadas (en lote): {len(atenciones_a_insertar)}")
 print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
