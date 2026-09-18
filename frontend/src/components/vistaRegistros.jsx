@@ -110,6 +110,11 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       <div>
         <h2>Hospitales pendientes de auditar</h2>
         {/* 🛠️ CORRECCIÓN: Usamos estrictamente 'pendientes'. Si el array está vacío, se mostrará vacío y no recurrirá a datos generales */}
+        {pendientes.length === 0 && <p>No hay hospitales pendientes de auditar.</p>}
+        <ListadoHospitales atenciones={Array.isArray(pendientes) ? pendientes : []} />
+      </div>
+    );
+  }
         <ListadoHospitales atenciones={Array.isArray(pendientes) ? pendientes : []} />
       </div>
     );
