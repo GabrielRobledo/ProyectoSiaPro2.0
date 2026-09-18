@@ -14,6 +14,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   const [hospitales, setHospitales] = useState([]);
   const { user } = useUser();
   const [pendientes, setPendientes] = useState([]);
+
   // 🔄 Traer hospitales pendientes de auditar asignados al auditor
   useEffect(() => {
     if (user?.idUsuario) {
@@ -108,7 +109,8 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return (
       <div>
         <h2>Hospitales pendientes de auditar</h2>
-        <ListadoHospitales atenciones={pendientes.length > 0 ? pendientes : datos} />
+        {/* 🛠️ CORRECCIÓN: Usamos estrictamente 'pendientes'. Si el array está vacío, se mostrará vacío y no recurrirá a datos generales */}
+        <ListadoHospitales atenciones={Array.isArray(pendientes) ? pendientes : []} />
       </div>
     );
   }
