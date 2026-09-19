@@ -88,7 +88,6 @@ exports.obtenerTodasAsignaciones = (req, res) => {
 exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
   const { idUsuario } = req.params;
 
-  // 1. Verificamos qué tipo de usuario es (Administrador o Auditor)
   const sqlRol = 'SELECT idTipoUsuario FROM usuarios WHERE idUsuario = ?';
   
   db.query(sqlRol, [idUsuario], (err, userRows) => {
@@ -101,30 +100,41 @@ exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
     let sqlQuery = '';
     let queryParams = [];
 
-    // 2. Si es Administrador (ej: idTipoUsuario 1), ve TODOS los hospitales pendientes generales 
-    // (excluyendo los que ya tienen cierres o borradores activos en curso)
+    // Consulta adaptada para incluir los totales por ámbito (Ambulatorio e Internación)
     if (idTipoUsuario === 1) {
       sqlQuery = `
-        SELECT DISTINCT e.* 
+        SELECT 
+          e.idEfector, 
+          e.codPrestador, 
+          e.RazonSocial,
+          SUM(CASE WHEN a.tipoAtencion LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS Ambulatorio,
+          SUM(CASE WHEN a.tipoAtencion LIKE '%internacion%' THEN 1 ELSE 0 END) AS Internacion
         FROM efectores e
+        LEFT JOIN atenciones a ON e.idEfector = a.idEfector
         WHERE e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
           AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+        GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
       `;
       queryParams = [];
     } else {
-      // 3. Si es Auditor (ej: idTipoUsuario 2), ve SOLO sus hospitales asignados y pendientes
       sqlQuery = `
-        SELECT DISTINCT e.* 
+        SELECT 
+          e.idEfector, 
+          e.codPrestador, 
+          e.RazonSocial,
+          SUM(CASE WHEN a.tipoAtencion LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS Ambulatorio,
+          SUM(CASE WHEN a.tipoAtencion LIKE '%internacion%' THEN 1 ELSE 0 END) AS Internacion
         FROM efectores e
         JOIN auditor_efector ae ON e.idEfector = ae.idEfector
+        LEFT JOIN atenciones a ON e.idEfector = a.idEfector
         WHERE ae.idUsuario = ?
           AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
           AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+        GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
       `;
       queryParams = [idUsuario];
     }
 
-    // 4. Ejecutamos la consulta correspondiente
     db.query(sqlQuery, queryParams, (errQuery, asignaciones) => {
       if (errQuery) {
         console.error('Error al obtener asignaciones sin auditoría:', errQuery);
