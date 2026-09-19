@@ -87,14 +87,53 @@ exports.obtenerTodasAsignaciones = (req, res) => {
 
 exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
   const { idUsuario } = req.params;
-  AsignacionesSinAuditoria.getAsignacionesSinAuditoria(idUsuario, (err, asignaciones) => {
-    if (err) {
-      console.error('Error al obtener asignaciones sin auditoría:', err);
-      return res.status(500).json({ msg: 'Error al obtener asignaciones sin auditoría' });
+
+  // 1. Verificamos qué tipo de usuario es (Administrador o Auditor)
+  const sqlRol = 'SELECT idTipoUsuario FROM usuarios WHERE idUsuario = ?';
+  
+  db.query(sqlRol, [idUsuario], (err, userRows) => {
+    if (err || userRows.length === 0) {
+      console.error('Error al verificar el rol del usuario:', err);
+      return res.status(500).json({ msg: 'Error al verificar el usuario' });
     }
-    res.json(asignaciones);
+
+    const idTipoUsuario = userRows[0].idTipoUsuario;
+    let sqlQuery = '';
+    let queryParams = [];
+
+    // 2. Si es Administrador (ej: idTipoUsuario 1), ve TODOS los hospitales pendientes generales 
+    // (excluyendo los que ya tienen cierres o borradores activos en curso)
+    if (idTipoUsuario === 1) {
+      sqlQuery = `
+        SELECT DISTINCT e.* 
+        FROM efectores e
+        WHERE e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
+          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+      `;
+      queryParams = [];
+    } else {
+      // 3. Si es Auditor (ej: idTipoUsuario 2), ve SOLO sus hospitales asignados y pendientes
+      sqlQuery = `
+        SELECT DISTINCT e.* 
+        FROM efectores e
+        JOIN auditor_efector ae ON e.idEfector = ae.idEfector
+        WHERE ae.idUsuario = ?
+          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
+          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+      `;
+      queryParams = [idUsuario];
+    }
+
+    // 4. Ejecutamos la consulta correspondiente
+    db.query(sqlQuery, queryParams, (errQuery, asignaciones) => {
+      if (errQuery) {
+        console.error('Error al obtener asignaciones sin auditoría:', errQuery);
+        return res.status(500).json({ msg: 'Error al obtener asignaciones sin auditoría' });
+      }
+      res.json(asignaciones);
+    });
   });
-}
+};
 
 // Obtener auditorías en progreso para un usuario
 exports.obtenerAuditoriasEnProgreso = (req, res) => {
