@@ -100,39 +100,34 @@ exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
     let sqlQuery = '';
     let queryParams = [];
 
-    // Consulta adaptada para incluir los totales por ámbito (Ambulatorio e Internación)
+    // Si es Administrador (1): Trae todas las atenciones de hospitales que NO tienen cierres ni borradores
     if (idTipoUsuario === 1) {
       sqlQuery = `
-        SELECT 
-          e.idEfector, 
-          e.codPrestador, 
-          e.RazonSocial,
-          SUM(CASE WHEN a.tipoAtencion LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS Ambulatorio,
-          SUM(CASE WHEN a.tipoAtencion LIKE '%internacion%' THEN 1 ELSE 0 END) AS Internacion
-        FROM efectores e
-        LEFT JOIN atenciones a ON e.idEfector = a.idEfector
-        WHERE e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
-          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
-        GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
+        SELECT a.*, e.RazonSocial, 0 AS reasignado
+        FROM atenciones AS a
+        JOIN efectores e ON a.idEfector = e.idEfector
+        WHERE a.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria)
+          AND a.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+        ORDER BY a.idAtencion ASC
       `;
       queryParams = [];
     } else {
+      // Si es Auditor: Trae las atenciones de sus hospitales asignados y pendientes
       sqlQuery = `
-        SELECT 
-          e.idEfector, 
-          e.codPrestador, 
-          e.RazonSocial,
-          SUM(CASE WHEN a.tipoAtencion LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS Ambulatorio,
-          SUM(CASE WHEN a.tipoAtencion LIKE '%internacion%' THEN 1 ELSE 0 END) AS Internacion
-        FROM efectores e
-        JOIN auditor_efector ae ON e.idEfector = ae.idEfector
-        LEFT JOIN atenciones a ON e.idEfector = a.idEfector
-        WHERE ae.idUsuario = ?
-          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM cierres)
-          AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
-        GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
+        SELECT a.*, e.RazonSocial, ae.reasignado
+        FROM atenciones AS a
+        JOIN efectores e ON a.idEfector = e.idEfector
+        JOIN auditor_efector ae ON a.idEfector = ae.idEfector AND ae.idUsuario = ?
+        WHERE a.idEfector IN (
+            SELECT ae2.idEfector
+            FROM auditor_efector AS ae2
+            LEFT JOIN auditoria AS au ON ae2.idEfector = au.idEfector
+            LEFT JOIN auditoria_en_progreso AS ap ON ae2.idEfector = ap.idEfector
+            WHERE ae2.idUsuario = ? AND au.idAuditoria IS NULL AND ap.idSerial IS NULL
+        )
+        ORDER BY a.idAtencion ASC
       `;
-      queryParams = [idUsuario];
+      queryParams = [idUsuario, idUsuario];
     }
 
     db.query(sqlQuery, queryParams, (errQuery, asignaciones) => {
