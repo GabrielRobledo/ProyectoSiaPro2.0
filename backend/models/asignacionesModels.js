@@ -17,26 +17,60 @@ const Asignaciones = {
 };
 
 const AsignacionesSinAuditoria = {
-    // Devuelve los efectores asignados a un usuario, solo ids
-        // Devuelve los efectores asignados a un usuario, con idAsignacion e idEfector
+    // Devuelve los efectores pendientes con sus totales según el rol
     getAsignacionesSinAuditoria: (idUsuario, callback) => {
-        const sql = `
-            SELECT a.*, e.RazonSocial, ae.reasignado
-            FROM atenciones AS a
-            JOIN efectores e ON a.idEfector = e.idEfector
-            JOIN auditor_efector ae ON a.idEfector = ae.idEfector AND ae.idUsuario = ?
-            WHERE a.idEfector IN (
-                SELECT ae2.idEfector
-                FROM auditor_efector AS ae2
-                LEFT JOIN auditoria AS au ON ae2.idEfector = au.idEfector
-                LEFT JOIN auditoria_en_progreso AS ap ON ae2.idEfector = ap.idEfector
-                WHERE ae2.idUsuario = ? AND au.idAuditoria IS NULL AND ap.idSerial IS NULL
-            )
-            ORDER BY a.idAtencion ASC
-        `;
-        db.query(sql, [idUsuario, idUsuario], (err, results) => {
-            if (err) return callback(err);
-            callback(null, results);
+        // Primero necesitamos saber si el usuario es admin o auditor
+        const sqlRol = 'SELECT idTipoUsuario FROM usuarios WHERE idUsuario = ?';
+        
+        db.query(sqlRol, [idUsuario], (err, userRows) => {
+            if (err || userRows.length === 0) {
+                return callback(err || new Error('Usuario no encontrado'));
+            }
+
+            const idTipoUsuario = userRows[0].idTipoUsuario;
+            let sql = '';
+            let params = [];
+
+            if (idTipoUsuario === 1) {
+                // Administrador: ve TODOS los hospitales pendientes generales (sin cierres ni borradores)
+                sql = `
+                    SELECT 
+                        e.idEfector, 
+                        e.codPrestador, 
+                        e.RazonSocial,
+                        SUM(CASE WHEN LOWER(a.tipoAtencion) LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS ambulatorio,
+                        SUM(CASE WHEN LOWER(a.tipoAtencion) LIKE '%internacion%' THEN 1 ELSE 0 END) AS internacion
+                    FROM efectores e
+                    LEFT JOIN atenciones a ON e.idEfector = a.idEfector
+                    WHERE e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria)
+                      AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+                    GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
+                `;
+                params = [];
+            } else {
+                // Auditor: ve solo SUS hospitales asignados y pendientes (tu lógica original mejorada)
+                sql = `
+                    SELECT 
+                        e.idEfector, 
+                        e.codPrestador, 
+                        e.RazonSocial,
+                        SUM(CASE WHEN LOWER(a.tipoAtencion) LIKE '%ambulatorio%' THEN 1 ELSE 0 END) AS ambulatorio,
+                        SUM(CASE WHEN LOWER(a.tipoAtencion) LIKE '%internacion%' THEN 1 ELSE 0 END) AS internacion
+                    FROM efectores e
+                    JOIN auditor_efector ae ON e.idEfector = ae.idEfector
+                    LEFT JOIN atenciones a ON e.idEfector = a.idEfector
+                    WHERE ae.idUsuario = ?
+                      AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria)
+                      AND e.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+                    GROUP BY e.idEfector, e.codPrestador, e.RazonSocial
+                `;
+                params = [idUsuario];
+            }
+
+            db.query(sql, params, (errQuery, results) => {
+                if (errQuery) return callback(errQuery);
+                callback(null, results);
+            });
         });
     }
 };
