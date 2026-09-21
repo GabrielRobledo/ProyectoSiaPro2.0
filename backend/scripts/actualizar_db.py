@@ -183,7 +183,7 @@ map_nomencladores = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
 cursor.execute("SELECT codPrestador, idEfector FROM efectores")
 map_efectores = {str(row[0]): row[1] for row in cursor.fetchall()}
 
-# 6. INSERTAR ATENCIONES EN LOTE
+# 6. INSERTAR ATENCIONES EN LOTE (Usando INSERT IGNORE para frenar duplicados)
 print("Preparando e insertando Atenciones del período...")
 atenciones_a_insertar = []
 
@@ -224,20 +224,27 @@ for _, row in df.iterrows():
 
     atenciones_a_insertar.append((tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
 
-# Insertar masivamente en bloques usando executemany (Tu estructura original exacta)
+# CONTADOR REAL DE FILAS INSERTADAS EFECTIVAMENTE
+atenciones_realmente_insertadas = 0
+
 if atenciones_a_insertar:
-    cursor.executemany("""INSERT INTO atenciones 
+    # Usamos INSERT IGNORE para que la BD rechace las repetidas
+    cursor.executemany("""INSERT IGNORE INTO atenciones 
                           (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
     db.commit()
+    
+    # cursor.rowcount nos da el número exacto de filas nuevas insertadas (sin contar las ignoradas)
+    atenciones_realmente_insertadas = cursor.rowcount
 
+print(f"Atenciones nuevas insertadas efectivamente: {atenciones_realmente_insertadas}")
+
+# =========================================================================
+# VALIDACIÓN INTELIGENTE: Solo registrar en el histórico si hubo atenciones nuevas reales
+# =========================================================================
+if atenciones_realmente_insertadas > 0:
     nombre_archivo_actual = os.path.basename(file_path)
-
-print(f"Atenciones nuevas insertadas (en lote): {len(atenciones_a_insertar)}")
-# =========================================================================
-# VALIDACIÓN INTELIGENTE: Solo registrar en el histórico si hubo atenciones nuevas
-# =========================================================================
-if len(atenciones_a_insertar) > 0:
+    
     cursor.execute("""
         INSERT INTO historial_importaciones 
         (nombreArchivo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
@@ -245,7 +252,7 @@ if len(atenciones_a_insertar) > 0:
     """, (
         nombre_archivo_actual,
         len(df),
-        len(atenciones_a_insertar),
+        atenciones_realmente_insertadas,
         len(nuevos_beneficiarios),
         len(nuevos_efectores),
         len(a_insertar_nom),
@@ -254,11 +261,11 @@ if len(atenciones_a_insertar) > 0:
     db.commit()
     print("Historial registrado correctamente.")
 else:
-    print("Aviso: No se registraron atenciones nuevas, por lo que no se generó entrada en el historial.")
+    print("Aviso: El archivo no generó atenciones nuevas (ya se encontraba importado), no se crea registro histórico.")
 
 print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
 
-# JSON final para Node.js y React
+# JSON final para Node.js y React (usamos el contador real)
 resumen = {
     "status": "success",
     "mensaje": "¡Proceso mensual cargado con éxito!",
@@ -268,6 +275,6 @@ resumen = {
     "nomencladoresActualizados": len(a_actualizar_nom),
     "beneficiariosNuevos": len(nuevos_beneficiarios),
     "efectoresNuevos": len(nuevos_efectores),
-    "atencionesInsertadas": len(atenciones_a_insertar),
+    "atencionesInsertadas": atenciones_realmente_insertadas,
 }
 print(json.dumps(resumen))
