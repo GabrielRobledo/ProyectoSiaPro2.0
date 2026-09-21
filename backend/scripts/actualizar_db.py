@@ -4,6 +4,7 @@ import pandas as pd
 import pymysql
 import json
 
+
 # CONEXIÓN CON MYSQL
 db = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),

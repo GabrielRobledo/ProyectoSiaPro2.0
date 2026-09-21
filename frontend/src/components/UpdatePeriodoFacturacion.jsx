@@ -125,8 +125,8 @@ const UpdatePeriodoFacturacion = () => {
         },
         {
             title: 'Periodo',
-            dataIndex: 'nombreArchivo',
-            key: 'nombreArchivo',
+            dataIndex: 'periodo',
+            key: 'periodo',
         },
         {
             title: 'Fecha y Hora de Carga',
