@@ -4,7 +4,7 @@ const multer = require('multer');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const db = require('../db'); // Asegúrate de tener tu conexión a la base de datos configurada
+const db = require('../db/conexion'); // Asegúrate de tener tu conexión a la base de datos configurada
 
 const upload = multer({ dest: 'uploads/' });
 
