@@ -25,7 +25,14 @@ const novedadesRoutes = require('./routes/novedadesRoutes');
 const importRoutes = require('./routes/importRoutes');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://proyecto-sia-pro2-0.vercel.app', // Tu frontend en producción en Vercel
+        'http://localhost:3000'                  // Por si probás localmente con Vite
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
