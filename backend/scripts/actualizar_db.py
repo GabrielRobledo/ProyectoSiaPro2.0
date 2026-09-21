@@ -34,6 +34,28 @@ except Exception as e:
     print(f"Error al leer las hojas del Excel: {e}")
     sys.exit(1)
 
+# =========================================================================
+# EXTRACCIÓN Y FORMATEO DEL PERIODO (aaaa-mm) DESDE FECHA_DE_PRESTACION
+# =========================================================================
+periodo_formateado = "Desconocido"
+try:
+    if "FECHA_DE_PRESTACION" in df.columns and not df.empty:
+        # Tomamos el primer valor no nulo de la columna FECHA_DE_PRESTACION
+        primera_fecha_str = df["FECHA_DE_PRESTACION"].dropna().iloc[0]
+        
+        # Convertimos el string (ej: '10-aug-24') a fecha usando pandas
+        # format='%d-%b-%y' interpreta perfectamente el día, el mes abreviado en inglés y el año de 2 dígitos
+        fecha_dt = pd.to_datetime(primera_fecha_str, format='%d-%b-%y')
+        
+        # Lo formateamos como año-mes ('aaaa-mm', ej: '2024-08')
+        periodo_formateado = fecha_dt.strftime('%Y-%m')
+except Exception as e:
+    print(f"Aviso: No se pudo extraer automáticamente el periodo de la fecha: {e}")
+    # Fallback por si la fecha viene en otro formato o está vacía
+    periodo_formateado = "2026-08" 
+
+print(f"Periodo detectado para el histórico: {periodo_formateado}")    
+
 # 1. VERIFICAR / CREAR TABLAS PRINCIPALES (con la columna descripcion en TEXT para evitar desbordamientos)
 cursor.execute("""CREATE TABLE IF NOT EXISTS modulos(
                     idModulo int primary key,
@@ -247,10 +269,10 @@ if atenciones_realmente_insertadas > 0:
     
     cursor.execute("""
         INSERT INTO historial_importaciones 
-        (nombreArchivo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
+        (periodo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (
-        nombre_archivo_actual,
+        periodo_formateado,
         len(df),
         atenciones_realmente_insertadas,
         len(nuevos_beneficiarios),
