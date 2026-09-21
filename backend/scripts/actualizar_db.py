@@ -233,6 +233,30 @@ if atenciones_a_insertar:
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
     db.commit()
 
+# ==========================================================
+# INSERTAR EL REGISTRO EN LA TABLA HISTORIAL DE IMPORTACIONES
+# ==========================================================
+try:
+    nombre_archivo_actual = sys.argv[1] if len(sys.argv) > 1 else 'BasePami.xlsx'
+
+    cursor.execute("""
+        INSERT INTO historial_importaciones 
+        (nombreArchivo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (
+        nombre_archivo_actual,
+        len(df),
+        len(atenciones_a_insertar),
+        len(nuevos_beneficiarios),
+        len(nuevos_efectores),
+        len(a_insertar_nom),
+        'Completado'
+    ))
+    db.commit()
+    print("Historial registrado correctamente.")
+except Exception as e:
+    print(f"Error al registrar el historial: {e}")    
+
 resumen = {
     "status": "success",
     "mensaje": "¡Proceso mensual cargado con éxito!",
