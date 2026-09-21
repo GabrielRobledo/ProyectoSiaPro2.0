@@ -124,7 +124,7 @@ const UpdatePeriodoFacturacion = () => {
             key: 'idHistorial',
         },
         {
-            title: 'Archivo / Periodo',
+            title: 'Periodo',
             dataIndex: 'nombreArchivo',
             key: 'nombreArchivo',
         },

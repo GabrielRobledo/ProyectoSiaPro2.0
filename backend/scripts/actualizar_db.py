@@ -201,8 +201,6 @@ for _, row in df.iterrows():
     idBen = map_beneficiarios.get(nrobene)
     if not idBen: continue
 
-    # Nota: si necesitás el idModulo para buscar el nomenclador, asegurate de tenerlo mapeado, 
-    # aquí buscamos por codPractica o usando el módulo correspondiente de la fila
     try:
         mod_id = int(row["MODULO"])
         cod_prac = int(row["PRACTICA"])
@@ -226,19 +224,20 @@ for _, row in df.iterrows():
 
     atenciones_a_insertar.append((tipo_atn, fecha_gral, idBen, idNom, fecha_prac, cantidad, valor_total, idEfec))
 
-# Insertar masivamente en bloques usando executemany
+# Insertar masivamente en bloques usando executemany (Tu estructura original exacta)
 if atenciones_a_insertar:
     cursor.executemany("""INSERT INTO atenciones 
                           (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
     db.commit()
 
-# ==========================================================
-# INSERTAR EL REGISTRO EN LA TABLA HISTORIAL DE IMPORTACIONES
-# ==========================================================
-try:
-    nombre_archivo_actual = sys.argv[1] if len(sys.argv) > 1 else 'BasePami.xlsx'
+    nombre_archivo_actual = os.path.basename(file_path)
 
+print(f"Atenciones nuevas insertadas (en lote): {len(atenciones_a_insertar)}")
+# =========================================================================
+# VALIDACIÓN INTELIGENTE: Solo registrar en el histórico si hubo atenciones nuevas
+# =========================================================================
+if len(atenciones_a_insertar) > 0:
     cursor.execute("""
         INSERT INTO historial_importaciones 
         (nombreArchivo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
@@ -254,9 +253,12 @@ try:
     ))
     db.commit()
     print("Historial registrado correctamente.")
-except Exception as e:
-    print(f"Error al registrar el historial: {e}")    
+else:
+    print("Aviso: No se registraron atenciones nuevas, por lo que no se generó entrada en el historial.")
 
+print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
+
+# JSON final para Node.js y React
 resumen = {
     "status": "success",
     "mensaje": "¡Proceso mensual cargado con éxito!",
@@ -268,6 +270,4 @@ resumen = {
     "efectoresNuevos": len(nuevos_efectores),
     "atencionesInsertadas": len(atenciones_a_insertar),
 }
-
-# Imprimimos en formato JSON al final para que Node.js lo pueda leer fácilmente
 print(json.dumps(resumen))
