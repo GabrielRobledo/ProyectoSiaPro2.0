@@ -70,6 +70,19 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS atenciones(
                     FOREIGN KEY(idBeneficiario) REFERENCES beneficiarios(idBeneficiario),
                     FOREIGN KEY(idNomenclador) REFERENCES nomencladores(idNomenclador),
                     FOREIGN KEY(idEfector) REFERENCES efectores(idEfector));""")
+
+cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS historial_importaciones (
+                        idHistorial INT AUTO_INCREMENT PRIMARY KEY,
+                        nombreArchivo VARCHAR(255) NOT NULL,
+                        fechaCarga TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        filasHoja1 INT,
+                        atencionesInsertadas INT,
+                        beneficiariosNuevos INT,
+                        efectoresNuevos INT,
+                        nomencladoresInsertados INT,
+                        estado VARCHAR(50) DEFAULT 'Completado'
+                    );  """)
 db.commit()
 print("Tablas verificadas/creadas correctamente.")
 

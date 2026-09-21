@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic } from 'antd';
+import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic, Table } from 'antd';
 import { 
     CloudUploadOutlined, 
     CheckCircleOutlined, 
@@ -9,7 +9,9 @@ import {
     FileTextOutlined, 
     UserAddOutlined, 
     TeamOutlined, 
-    MedicineBoxOutlined 
+    MedicineBoxOutlined,
+    DashboardOutlined,
+    HistoryOutlined 
 } from '@ant-design/icons';
 import API_URL from '../config';
 
@@ -21,6 +23,25 @@ const UpdatePeriodoFacturacion = () => {
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [resumenData, setResumenData] = useState(null);
+    const [historico, setHistorico] = useState([]);
+    const [loadingHistorico, setLoadingHistorico] = useState(false);
+
+    // Cargar el historial al montar el componente
+    useEffect(() => {
+        cargarHistorico();
+    }, []);
+
+    const cargarHistorico = async () => {
+        setLoadingHistorico(true);
+        try {
+            const response = await axios.get(`${API_URL}/api/periodos-historicos`);
+            setHistorico(response.data);
+        } catch (error) {
+            console.error('Error al cargar el historial:', error);
+        } finally {
+            setLoadingHistorico(false);
+        }
+    };
 
     const handleUpload = async () => {
         if (!file) {
@@ -43,7 +64,6 @@ const UpdatePeriodoFacturacion = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
-            // Capturamos el resumen devuelto por el backend (generado por Python)
             const dataResumen = response.data.resumen || {
                 filasHoja1: 0,
                 atencionesInsertadas: 0,
@@ -55,10 +75,11 @@ const UpdatePeriodoFacturacion = () => {
             setResumenData(dataResumen);
             setStatus({ 
                 type: 'success', 
-                msg: '¡Base de datos actualizada con éxito mediante el script de Python!' 
+                msg: '¡Base de datos actualizada con éxito mediante el motor Python!' 
             });
             message.success('Importación finalizada con éxito.');
             setFile(null); 
+            cargarHistorico(); // Recargar la tabla histórica automáticamente
         } catch (error) {
             console.error('Error en la carga:', error);
             setStatus({ 
@@ -95,90 +116,206 @@ const UpdatePeriodoFacturacion = () => {
         return <InfoCircleOutlined />;
     };
 
+    // Columnas de la tabla histórica
+    const columnsHistorico = [
+        {
+            title: '#ID',
+            dataIndex: 'idHistorial',
+            key: 'idHistorial',
+        },
+        {
+            title: 'Archivo / Periodo',
+            dataIndex: 'nombreArchivo',
+            key: 'nombreArchivo',
+        },
+        {
+            title: 'Fecha y Hora de Carga',
+            dataIndex: 'fechaCarga',
+            key: 'fechaCarga',
+            render: (fecha) => fecha ? new Date(fecha).toLocaleString() : '-'
+        },
+        {
+            title: 'Filas Procesadas',
+            dataIndex: 'filasHoja1',
+            key: 'filasHoja1',
+        },
+        {
+            title: 'Atenciones',
+            dataIndex: 'atencionesInsertadas',
+            key: 'atencionesInsertadas',
+        },
+        {
+            title: 'Estado',
+            dataIndex: 'estado',
+            key: 'estado',
+            render: (text) => <span style={{ color: '#3f8600', fontWeight: '500' }}>{text || 'Completado'}</span>
+        }
+    ];
+
     return (
-        <div style={{ padding: '40px', display: 'flex', justifyContent: 'center' }}>
-            <Card 
-                style={{ 
-                    width: '100%', 
-                    maxWidth: '750px', 
-                    borderRadius: '12px', 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)' 
-                }}
-            >
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <Title level={3} style={{ marginBottom: '8px' }}>Sincronización de Periodo</Title>
+        <div style={{ padding: '30px 40px', maxWidth: '1300px', margin: '0 auto' }}>
+            
+            {/* Cabecera del Módulo */}
+            <div style={{ marginBottom: '24px' }}>
+                <Space align="center" size="middle">
+                    <DashboardOutlined style={{ fontSize: '28px', color: '#1890ff' }} />
+                    <div>
+                        <Title level={2} style={{ margin: 0 }}>Sincronización de Periodo de Facturación</Title>
                         <Text type="secondary">
-                            Actualización masiva de beneficiarios, efectores y nomencladores mediante motor Python.
+                            Actualización masiva de nomencladores, efectores, beneficiarios y atenciones mediante motor Python.
                         </Text>
                     </div>
+                </Space>
+                <Divider style={{ marginTop: '16px', marginBottom: '24px' }} />
+            </div>
 
-                    <Divider style={{ margin: '0' }} />
-
-                    <Dragger {...draggerProps} disabled={loading}>
-                        <p className="ant-upload-drag-icon">
-                            <CloudUploadOutlined style={{ color: '#1890ff', fontSize: '48px' }} />
-                        </p>
-                        <p className="ant-upload-text">Haga clic o arrastre el archivo Excel aquí</p>
-                        <p className="ant-upload-hint">
-                            Formatos permitidos: .xlsx, .xlsm.
-                        </p>
-                    </Dragger>
-
-                    {status.msg && (
-                        <Alert
-                            message={status.type === 'success' ? 'Operación Exitosa' : status.type === 'error' ? 'Error de Proceso' : 'Información'}
-                            description={status.msg}
-                            type={status.type === 'info' ? 'info' : status.type}
-                            showIcon
-                            icon={getStatusIcon()}
-                        />
-                    )}
-
-                    {/* Resumen Estadístico post-carga */}
-                    {resumenData && (
-                        <Card type="inner" title="Resumen de la Importación Actual" style={{ backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                            <Row gutter={16}>
-                                <Col span={8}>
-                                    <Statistic title="Total Filas Hoja 1" value={resumenData.filasHoja1} prefix={<FileTextOutlined />} />
-                                </Col>
-                                <Col span={8}>
-                                    <Statistic title="Atenciones Insertadas" value={resumenData.atencionesInsertadas} valueStyle={{ color: '#3f8600' }} prefix={<MedicineBoxOutlined />} />
-                                </Col>
-                                <Col span={8}>
-                                    <Statistic title="Beneficiarios Nuevos" value={resumenData.beneficiariosNuevos} prefix={<UserAddOutlined />} />
-                                </Col>
-                            </Row>
-                            <Row gutter={16} style={{ marginTop: '16px' }}>
-                                <Col span={12}>
-                                    <Statistic title="Efectores Nuevos" value={resumenData.efectoresNuevos} prefix={<TeamOutlined />} />
-                                </Col>
-                                <Col span={12}>
-                                    <Statistic title="Nomencladores Nuevos" value={resumenData.nomencladoresInsertados} />
-                                </Col>
-                            </Row>
-                        </Card>
-                    )}
-
-                    <Button
-                        type="primary"
-                        size="large"
-                        block
-                        icon={<CloudUploadOutlined />}
-                        loading={loading}
-                        onClick={handleUpload}
-                        disabled={!file}
+            {/* Fila Superior: Dos Columnas (Cargador y Resumen) */}
+            <Row gutter={[24, 24]} align="stretch" style={{ marginBottom: '24px' }}>
+                
+                {/* COLUMNA IZQUIERDA: Formulario de Carga */}
+                <Col xs={24} lg={10}>
+                    <Card 
+                        title="Subir Archivo Mensual"
+                        bordered={false}
                         style={{ 
-                            height: '55px', 
-                            borderRadius: '8px', 
-                            fontSize: '16px',
-                            fontWeight: '500' 
+                            height: '100%', 
+                            borderRadius: '12px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)' 
                         }}
                     >
-                        {loading ? 'Ejecutando proceso en segundo plano...' : 'Iniciar Sincronización'}
-                    </Button>
-                </Space>
-            </Card>
+                        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                            <Dragger {...draggerProps} disabled={loading} style={{ padding: '15px 0' }}>
+                                <p className="ant-upload-drag-icon">
+                                    <CloudUploadOutlined style={{ color: '#1890ff', fontSize: '42px' }} />
+                                </p>
+                                <p className="ant-upload-text">Haga clic o arrastre el Excel aquí</p>
+                                <p className="ant-upload-hint">Formatos: .xlsx, .xlsm</p>
+                            </Dragger>
+
+                            {status.msg && (
+                                <Alert
+                                    message={status.type === 'success' ? 'Éxito' : status.type === 'error' ? 'Error' : 'Aviso'}
+                                    description={status.msg}
+                                    type={status.type === 'info' ? 'info' : status.type}
+                                    showIcon
+                                    icon={getStatusIcon()}
+                                />
+                            )}
+
+                            <Button
+                                type="primary"
+                                size="large"
+                                block
+                                icon={<CloudUploadOutlined />}
+                                loading={loading}
+                                onClick={handleUpload}
+                                disabled={!file}
+                                style={{ 
+                                    height: '50px', 
+                                    borderRadius: '8px', 
+                                    fontSize: '15px',
+                                    fontWeight: '500' 
+                                }}
+                            >
+                                {loading ? 'Procesando en segundo plano...' : 'Iniciar Sincronización'}
+                            </Button>
+                        </Space>
+                    </Card>
+                </Col>
+
+                {/* COLUMNA DERECHA: Resumen Estadístico */}
+                <Col xs={24} lg={14}>
+                    <Card 
+                        title="Resumen de Resultados de la Carga"
+                        bordered={false}
+                        style={{ 
+                            height: '100%', 
+                            borderRadius: '12px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                            backgroundColor: '#fafafa'
+                        }}
+                    >
+                        {resumenData ? (
+                            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                <Row gutter={[16, 16]}>
+                                    <Col span={12}>
+                                        <Card size="small" style={{ borderRadius: '8px' }}>
+                                            <Statistic title="Total Filas Hoja 1" value={resumenData.filasHoja1} prefix={<FileTextOutlined />} />
+                                        </Card>
+                                    </Col>
+                                    <Col span={12}>
+                                        <Card size="small" style={{ borderRadius: '8px' }}>
+                                            <Statistic title="Atenciones Insertadas" value={resumenData.atencionesInsertadas} valueStyle={{ color: '#3f8600' }} prefix={<MedicineBoxOutlined />} />
+                                        </Card>
+                                    </Col>
+                                </Row>
+                                <Row gutter={[16, 16]}>
+                                    <Col span={8}>
+                                        <Card size="small" style={{ borderRadius: '8px' }}>
+                                            <Statistic title="Beneficiarios" value={resumenData.beneficiariosNuevos} prefix={<UserAddOutlined />} />
+                                        </Card>
+                                    </Col>
+                                    <Col span={8}>
+                                        <Card size="small" style={{ borderRadius: '8px' }}>
+                                            <Statistic title="Efectores" value={resumenData.efectoresNuevos} prefix={<TeamOutlined />} />
+                                        </Card>
+                                    </Col>
+                                    <Col span={8}>
+                                        <Card size="small" style={{ borderRadius: '8px' }}>
+                                            <Statistic title="Nomencladores" value={resumenData.nomencladoresInsertados} />
+                                        </Card>
+                                    </Col>
+                                </Row>
+                            </Space>
+                        ) : (
+                            <div style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                height: '220px', 
+                                color: '#bfbfbf',
+                                textAlign: 'center'
+                            }}>
+                                <FileTextOutlined style={{ fontSize: '48px', marginBottom: '12px' }} />
+                                <Text type="secondary">Aún no se ha procesado ningún archivo en esta sesión.</Text>
+                                <Text type="secondary" style={{ fontSize: '13px' }}>Los indicadores métricos aparecerán aquí al finalizar la importación.</Text>
+                            </div>
+                        )}
+                    </Card>
+                </Col>
+
+            </Row>
+
+            {/* Fila Inferior: Tabla de Historial de Importaciones */}
+            <Row>
+                <Col span={24}>
+                    <Card 
+                        title={
+                            <Space>
+                                <HistoryOutlined style={{ color: '#1890ff' }} />
+                                <span>Historial de Periodos Cargados</span>
+                            </Space>
+                        }
+                        bordered={false}
+                        style={{ 
+                            borderRadius: '12px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)' 
+                        }}
+                    >
+                        <Table 
+                            dataSource={historico} 
+                            columns={columnsHistorico} 
+                            rowKey="idHistorial" 
+                            loading={loadingHistorico}
+                            pagination={{ pageSize: 5 }}
+                            size="middle"
+                            locale={{ emptyText: 'No hay registros históricos disponibles.' }}
+                        />
+                    </Card>
+                </Col>
+            </Row>
+
         </div>
     );
 };

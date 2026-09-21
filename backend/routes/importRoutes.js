@@ -64,4 +64,19 @@ router.post('/importar-excel', upload.single('archivo'), (req, res) => {
     });
 });
 
+// Endpoint para consultar el historial de importaciones
+router.get('/periodos-historicos', (req, res) => {
+    // Asumiendo que tenés configurada tu conexión a MySQL (ej: pool o db)
+    // Ajustá la consulta según cómo manejes la conexión en tu backend
+    const query = 'SELECT * FROM historial_importaciones ORDER BY fechaCarga DESC LIMIT 10';
+    
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener el historial:', err);
+            return res.status(500).json({ error: 'Error al consultar la base de datos' });
+        }
+        res.json(results);
+    });
+});
+
 module.exports = router;
