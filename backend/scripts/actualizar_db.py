@@ -2,6 +2,7 @@ import os
 import sys
 import pandas as pd
 import pymysql
+import json
 
 # CONEXIÓN CON MYSQL
 db = pymysql.connect(
@@ -231,5 +232,17 @@ if atenciones_a_insertar:
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
     db.commit()
 
-print(f"Atenciones nuevas insertadas (en lote): {len(atenciones_a_insertar)}")
-print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
+resumen = {
+    "status": "success",
+    "mensaje": "¡Proceso mensual cargado con éxito!",
+    "filasHoja1": len(df),
+    "modulosNuevos": len(nuevos_modulos),
+    "nomencladoresInsertados": len(a_insertar_nom),
+    "nomencladoresActualizados": len(a_actualizar_nom),
+    "beneficiariosNuevos": len(nuevos_beneficiarios),
+    "efectoresNuevos": len(nuevos_efectores),
+    "atencionesInsertadas": len(atenciones_a_insertar),
+}
+
+# Imprimimos en formato JSON al final para que Node.js lo pueda leer fácilmente
+print(json.dumps(resumen))

@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Card, Button, Upload, Typography, message, Alert, Space, Divider } from 'antd';
-import { CloudUploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic } from 'antd';
+import { 
+    CloudUploadOutlined, 
+    CheckCircleOutlined, 
+    ExclamationCircleOutlined, 
+    InfoCircleOutlined, 
+    FileTextOutlined, 
+    UserAddOutlined, 
+    TeamOutlined, 
+    MedicineBoxOutlined 
+} from '@ant-design/icons';
 import API_URL from '../config';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
 
-// Definición con PascalCase para evitar warnings de React
 const UpdatePeriodoFacturacion = () => {
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
+    const [resumenData, setResumenData] = useState(null);
 
     const handleUpload = async () => {
         if (!file) {
@@ -23,16 +32,27 @@ const UpdatePeriodoFacturacion = () => {
         formData.append('archivo', file);
 
         setLoading(true);
+        setResumenData(null);
         setStatus({ 
             type: 'info', 
             msg: 'Procesando archivo en el servidor... Por favor, no cierre la pestaña.' 
         });
 
         try {
-            await axios.post(`${API_URL}/api/importar-excel`, formData, {
+            const response = await axios.post(`${API_URL}/api/importar-excel`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
+            // Capturamos el resumen devuelto por el backend (generado por Python)
+            const dataResumen = response.data.resumen || {
+                filasHoja1: 0,
+                atencionesInsertadas: 0,
+                beneficiariosNuevos: 0,
+                efectoresNuevos: 0,
+                nomencladoresInsertados: 0
+            };
+
+            setResumenData(dataResumen);
             setStatus({ 
                 type: 'success', 
                 msg: '¡Base de datos actualizada con éxito mediante el script de Python!' 
@@ -58,16 +78,17 @@ const UpdatePeriodoFacturacion = () => {
         beforeUpload: (fileSelected) => {
             setFile(fileSelected);
             setStatus({ type: '', msg: '' });
-            return false; // Importante: evita la subida automática inmediata
+            setResumenData(null);
+            return false;
         },
         onRemove: () => {
             setFile(null);
             setStatus({ type: '', msg: '' });
+            setResumenData(null);
         },
         fileList: file ? [file] : [],
     };
 
-    // Función auxiliar para determinar el icono del Alert según el estado
     const getStatusIcon = () => {
         if (status.type === 'success') return <CheckCircleOutlined />;
         if (status.type === 'error') return <ExclamationCircleOutlined />;
@@ -79,7 +100,7 @@ const UpdatePeriodoFacturacion = () => {
             <Card 
                 style={{ 
                     width: '100%', 
-                    maxWidth: '700px', 
+                    maxWidth: '750px', 
                     borderRadius: '12px', 
                     boxShadow: '0 4px 12px rgba(0,0,0,0.08)' 
                 }}
@@ -112,6 +133,31 @@ const UpdatePeriodoFacturacion = () => {
                             showIcon
                             icon={getStatusIcon()}
                         />
+                    )}
+
+                    {/* Resumen Estadístico post-carga */}
+                    {resumenData && (
+                        <Card type="inner" title="Resumen de la Importación Actual" style={{ backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                            <Row gutter={16}>
+                                <Col span={8}>
+                                    <Statistic title="Total Filas Hoja 1" value={resumenData.filasHoja1} prefix={<FileTextOutlined />} />
+                                </Col>
+                                <Col span={8}>
+                                    <Statistic title="Atenciones Insertadas" value={resumenData.atencionesInsertadas} valueStyle={{ color: '#3f8600' }} prefix={<MedicineBoxOutlined />} />
+                                </Col>
+                                <Col span={8}>
+                                    <Statistic title="Beneficiarios Nuevos" value={resumenData.beneficiariosNuevos} prefix={<UserAddOutlined />} />
+                                </Col>
+                            </Row>
+                            <Row gutter={16} style={{ marginTop: '16px' }}>
+                                <Col span={12}>
+                                    <Statistic title="Efectores Nuevos" value={resumenData.efectoresNuevos} prefix={<TeamOutlined />} />
+                                </Col>
+                                <Col span={12}>
+                                    <Statistic title="Nomencladores Nuevos" value={resumenData.nomencladoresInsertados} />
+                                </Col>
+                            </Row>
+                        </Card>
                     )}
 
                     <Button
