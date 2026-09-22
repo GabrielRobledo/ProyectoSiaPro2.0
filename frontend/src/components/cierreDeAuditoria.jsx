@@ -8,6 +8,11 @@ import {
   Alert,
   Typography,
   Divider,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Table as AntTable
 } from 'antd';
 import {
   useReactTable,
@@ -15,11 +20,11 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table';
-import API_URL from '../config'
+import { CheckCircleOutlined, WarningOutlined, DashboardOutlined } from '@ant-design/icons';
+import API_URL from '../config';
 
+const { Title, Text } = Typography;
 const { Option } = Select;
-const { Title } = Typography;
-
 const columnHelper = createColumnHelper();
 
 const CierreDeAuditoria = ({ idUsuario }) => {
@@ -28,11 +33,8 @@ const CierreDeAuditoria = ({ idUsuario }) => {
   const [todosLosPeriodos, setTodosLosPeriodos] = useState([]);
   const [cierres, setCierres] = useState([]);
 
-  const [efectorSeleccionado, setEfectorSeleccionado] = useState('');
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
   const [loading, setLoading] = useState(true);
-  const [mensaje, setMensaje] = useState(null);
-  const [cierreHecho, setCierreHecho] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,7 +49,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
         const periodosUnicos = [...new Set(resAuditorias.data.map(a => a.periodo))];
         setTodosLosPeriodos(periodosUnicos);
       } catch (error) {
-        setMensaje({ type: 'error', text: 'Error al cargar efectores o auditorías' });
+        console.error('Error al cargar datos:', error);
       } finally {
         setLoading(false);
       }
@@ -64,266 +66,208 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       .catch((err) => console.error('Error al obtener cierres:', err));
   };
 
-  const efectoresFiltrados = useMemo(() => {
+  // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
+  const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    // Auditorías del período seleccionado
     const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
-
-    // IDs de efectores que tienen auditoría en ese período
-    const idsEfectoresConAuditoria = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
-
-    // IDs de efectores que ya tienen un cierre para ese período
+    const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
     const idsEfectoresConCierre = cierres
       .filter(c => c.periodo === periodoSeleccionado)
-      .map(c => c.idEfector); // Asegúrate de que `idEfector` esté incluido en la respuesta del backend
+      .map(c => c.idEfector);
 
-    // Filtrar efectores que:
-    // - tienen auditoría en ese período
-    // - NO tienen cierre en ese período
     return efectores.filter(
-      ef => idsEfectoresConAuditoria.includes(ef.idEfector) && !idsEfectoresConCierre.includes(ef.idEfector)
+      ef => idsEfectoresAuditados.includes(ef.idEfector) && !idsEfectoresConCierre.includes(ef.idEfector)
     );
   }, [periodoSeleccionado, auditorias, efectores, cierres]);
 
-  const generarCierre = async () => {
-    if (!efectorSeleccionado || !periodoSeleccionado) return;
+  // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
+  const efectoresNoAuditados = useMemo(() => {
+    if (!periodoSeleccionado) return [];
+
+    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
+    const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
+
+    return efectores.filter(ef => !idsEfectoresAuditados.includes(ef.idEfector));
+  }, [periodoSeleccionado, auditorias, efectores]);
+
+  const generarCierreGeneral = async () => {
+    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0) return;
 
     const confirmacion = await Swal.fire({
-      title: '¿Confirmar cierre?',
-      text: 'Una vez generado el cierre no se podrá revertir.',
+      title: '¿Confirmar Cierre General?',
+      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores auditados en el periodo ${periodoSeleccionado}.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Sí, generar',
+      confirmButtonText: 'Sí, generar cierre general',
       cancelButtonText: 'Cancelar',
     });
 
     if (!confirmacion.isConfirmed) return;
 
     try {
-      await axios.post(`${API_URL}/api/cierres`, {
-        idEfector: efectorSeleccionado,
+      // Envias al backend el periodo y la lista de IDs de efectores a cerrar masivamente
+      await axios.post(`${API_URL}/api/cierres-masivos`, {
         periodo: periodoSeleccionado,
+        efectoresIds: efectoresAuditadosPendientes.map(e => e.idEfector),
         idUsuario,
       });
 
-      Swal.fire('✅ Cierre exitoso', 'El cierre se generó correctamente.', 'success');
-
-      // Limpiar selección
-      setEfectorSeleccionado('');
+      Swal.fire('✅ Cierre General Exitoso', 'Los cierres del periodo se generaron correctamente.', 'success');
       setPeriodoSeleccionado('');
-      setCierreHecho(false);
-      setMensaje(null);
-
-      // Refrescar lista de cierres
       cargarCierres();
     } catch (error) {
-      Swal.fire('❌ Error', 'Hubo un problema al generar el cierre.', 'error');
+      Swal.fire('❌ Error', 'Hubo un problema al procesar el cierre masivo.', 'error');
     }
-    };
+  };
 
+  // Columnas para la tabla con TanStack Table
   const columns = useMemo(
     () => [
-      columnHelper.accessor('idCierre', {
-        header: 'ID',
-        cell: (info) => info.getValue(),
-      }),
-      columnHelper.accessor('periodo', {
-        header: 'Período',
+      columnHelper.accessor('codPrestador', {
+        header: 'Código',
         cell: (info) => info.getValue(),
       }),
       columnHelper.accessor('RazonSocial', {
-        header: 'Efector',
+        header: 'Hospital / Efector',
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor('usuario', {
-        header: 'Usuario',
-        cell: (info) => info.getValue(),
+      columnHelper.accessor('estado', {
+        header: 'Estado',
+        cell: () => <span style={{ color: '#52c41a', fontWeight: '500' }}>Listo para Cierre</span>,
       }),
-      
     ],
     []
   );
 
-
   const table = useReactTable({
-    data: cierres,
+    data: efectoresAuditadosPendientes,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
-  
-
   return (
-    <div
-      style={{
-        maxWidth: 1000,
-        margin: '40px auto',
-        padding: 32,
-        background: '#f9f9f9',
-        borderRadius: 12,
-        boxShadow: '0 6px 20px rgba(0,0,0,0.05)',
-        border: '1px solid #e0e0e0',
-        fontFamily: 'Inter, sans-serif',
-      }}
-    >
-      <Title level={3} style={{ marginBottom: 24, color: '#3f3f3f' }}>
-        Cierre de Auditoría
-      </Title>
+    <div style={{ maxWidth: 1100, margin: '40px auto', padding: 32, background: '#fff', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.05)' }}>
+      
+      <Space align="center" size="middle" style={{ marginBottom: 24 }}>
+        <DashboardOutlined style={{ fontSize: '28px', color: '#1890ff' }} />
+        <div>
+          <Title level={3} style={{ margin: 0 }}>Cierre General de Auditoría por Periodo</Title>
+          <Text type="secondary">Panel de control y consolidación de cierres hospitalarios mensuales.</Text>
+        </div>
+      </Space>
+
+      <Divider />
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}>
-          <Spin tip="Cargando datos..." size="large" />
-        </div>
+        <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
         <>
-          <div style={{ marginBottom: 40 }}>
-            <Title level={4} style={{ marginBottom: 16, color: '#555' }}>
-              Generar nuevo cierre
-            </Title>
-
-            {mensaje && (
-              <Alert
-                message={mensaje.text}
-                type={mensaje.type}
-                showIcon
-                style={{ marginBottom: 16 }}
-              />
-            )}
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontWeight: 600, color: '#555' }}>Período:</label>
-              <Select
-                placeholder="Seleccione un período"
-                value={periodoSeleccionado || undefined}
-                onChange={(value) => {
-                  setPeriodoSeleccionado(value);
-                  setEfectorSeleccionado('');
-                  setCierreHecho(false);
-                  setMensaje(null);
-                }}
-                style={{ width: '100%', marginTop: 8, borderRadius: 6 }}
-              >
-                {todosLosPeriodos.map((p, index) => (
-                  <Option key={index} value={p}>
-                    {p}
-                  </Option>
-                ))}
-              </Select>
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontWeight: 600, color: '#555' }}>Efector:</label>
-              <Select
-                placeholder="Seleccione un efector"
-                value={efectorSeleccionado || undefined}
-                onChange={(value) => {
-                  setEfectorSeleccionado(value);
-                }}
-                disabled={!periodoSeleccionado}
-                style={{ width: '100%', marginTop: 8, borderRadius: 6 }}
-                showSearch
-                filterOption={(input, option) =>
-                  option.children.toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {efectoresFiltrados.map((ef) => (
-                  <Option key={ef.idEfector} value={ef.idEfector}>
-                    {ef.RazonSocial}
-                  </Option>
-                ))}
-              </Select>
-              {periodoSeleccionado && !efectoresFiltrados.length && (
-                <small style={{ color: '#999', fontStyle: 'italic', marginTop: 8, display: 'block' }}>
-                  🚫 No hay efectores con auditoría en este período.
-                </small>
-              )}
-            </div>
-
-            <Button
-              type="primary"
-              block
-              size="large"
-              disabled={!efectorSeleccionado || !periodoSeleccionado || cierreHecho}
-              onClick={generarCierre}
-              style={{
-                marginTop: 16,
-                borderRadius: 6,
-                fontWeight: 'bold',
-                background: cierreHecho ? '#52c41a' : '#1890ff',
-                borderColor: cierreHecho ? '#52c41a' : '#1890ff',
-              }}
+          {/* Selección de Periodo */}
+          <div style={{ marginBottom: 24, maxWidth: '400px' }}>
+            <label style={{ fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Seleccionar Período a Cerrar:</label>
+            <Select
+              placeholder="Ej: 2024-08"
+              value={periodoSeleccionado || undefined}
+              onChange={(value) => setPeriodoSeleccionado(value)}
+              style={{ width: '100%' }}
             >
-              {cierreHecho ? '✅ Cierre generado' : '🚀 Generar Cierre'}
-            </Button>
+              {todosLosPeriodos.map((p, index) => (
+                <Option key={index} value={p}>{p}</Option>
+              ))}
+            </Select>
           </div>
 
-          <Divider />
-          <div>
-            <Title level={4} style={{ marginBottom: 16, color: '#555' }}>
-              Historial de Cierres
-            </Title>
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'separate',
-                  borderSpacing: 0,
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                }}
-              >
-                <thead>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <tr key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
-                        <th
-                          key={header.id}
-                          style={{
-                            padding: '12px 16px',
-                            background: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            borderBottom: '1px solid #eaeaea',
-                            textAlign: 'left',
-                          }}
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                        </th>
+          {periodoSeleccionado && (
+            <>
+              {/* Resumen Estadístico de la Situación del Periodo */}
+              <Row gutter={16} style={{ marginBottom: 24 }}>
+                <Col span={12}>
+                  <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
+                    <Statistic 
+                      title="Efectores Listos (Auditados)" 
+                      value={efectoresAuditadosPendientes.length} 
+                      valueStyle={{ color: '#3f8600' }}
+                      prefix={<CheckCircleOutlined />} 
+                    />
+                  </Card>
+                </Col>
+                <Col span={12}>
+                  <Card style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}>
+                    <Statistic 
+                      title="Efectores Sin Auditoría (No llegaron)" 
+                      value={efectoresNoAuditados.length} 
+                      valueStyle={{ color: '#faad14' }}
+                      prefix={<WarningOutlined />} 
+                    />
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Tabla de Efectores Listos para el Cierre */}
+              <div style={{ marginBottom: 24 }}>
+                <Title level={4} style={{ color: '#333' }}>Efectores Auditados pendientes de Cierre</Title>
+                <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      {table.getHeaderGroups().map(headerGroup => (
+                        <tr key={headerGroup.id} style={{ background: '#fafafa' }}>
+                          {headerGroup.headers.map(header => (
+                            <th key={header.id} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </th>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {table.getRowModel().rows.length ? (
-                    table.getRowModel().rows.map((row) => (
-                      <tr key={row.id}>
-                        {row.getVisibleCells().map((cell) => (
-                          <td
-                            key={cell.id}
-                            style={{
-                              padding: '12px 16px',
-                              background: '#fff',
-                              borderBottom: '1px solid #f0f0f0',
-                            }}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </thead>
+                    <tbody>
+                      {table.getRowModel().rows.length ? (
+                        table.getRowModel().rows.map(row => (
+                          <tr key={row.id}>
+                            {row.getVisibleCells().map(cell => (
+                              <td key={cell.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={columns.length} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                            No hay efectores pendientes de cierre para este período.
                           </td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={columns.length} style={{ textAlign: 'center', padding: 12 }}>
-                        No hay cierres registrados.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Listado resumido de los que NO llegaron */}
+              {efectoresNoAuditados.length > 0 && (
+                <div style={{ marginBottom: 24, padding: '16px', background: '#fff9f6', borderRadius: '8px', border: '1px solid #ffd8c2' }}>
+                  <Text strong style={{ color: '#d4380d' }}>Atención: Los siguientes efectores no registran auditorías finalizadas en este periodo y quedarán excluidos del cierre general:</Text>
+                  <ul style={{ margin: '8px 0 0 20px', color: '#595959' }}>
+                    {efectoresNoAuditados.map(ef => (
+                      <li key={ef.idEfector}>{ef.RazonSocial} (Cod: {ef.codPrestador})</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Botón de Ejecución del Cierre General */}
+              <Button
+                type="primary"
+                size="large"
+                block
+                disabled={efectoresAuditadosPendientes.length === 0}
+                onClick={generarCierreGeneral}
+                style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
+              >
+                🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
+              </Button>
+            </>
+          )}
         </>
       )}
     </div>
