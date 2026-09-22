@@ -53,18 +53,13 @@ const Cierre = {
   },
   // Dentro de tu archivo de modelo/servicio (ej: cierreModel.js o cierreServices.js)
 
-  crearCierreMasivo(periodo, efectoresIds, idUsuario) {
+crearCierreMasivo(periodo, efectoresIds, idUsuario) {
     return new Promise((resolve, reject) => {
       db.getConnection((err, connection) => {
-        if (err) return reject(err);
-
-        // Promisificamos las consultas con la conexión de la transacción
-        const queryTrans = (sql, params) => new Promise((res, rej) => {
-          connection.query(sql, params, (error, results) => {
-            if (error) return rej(error);
-            res(results);
-          });
-        });
+        if (err) {
+          // Si tu conexión no soporta pool.getConnection, usaremos consultas directas
+          return reject(err);
+        }
 
         connection.beginTransaction(async (errTx) => {
           if (errTx) {
@@ -75,11 +70,18 @@ const Cierre = {
           try {
             const cierresCreados = [];
 
+            // Función auxiliar para promesas con la conexión de la transacción
+            const queryTrans = (sql, params) => new Promise((res, rej) => {
+              connection.query(sql, params, (error, results) => {
+                if (error) return rej(error);
+                res(results);
+              });
+            });
+
             for (const idEfector of efectoresIds) {
               
-              // 1. Calcular los indicadores macro para este efector en este periodo
-              // (Reutilizando la lógica de agregación que ya tenías en tus consultas)
-              const [resumen] = await queryTrans(`
+              // 1. Calcular los indicadores macro exigidos para la tesis
+              const resumenRows = await queryTrans(`
                 SELECT 
                   COUNT(DISTINCT a.idAtencion) AS cantidadAtenciones,
                   SUM(IFNULL(a.valorTotal, 0)) AS totalFacturadoGeneral,
@@ -91,13 +93,14 @@ const Cierre = {
                 WHERE a.idEfector = ?
               `, [periodo, idEfector]);
 
+              const resumen = resumenRows[0] || {};
               const cantidadAtenciones = resumen.cantidadAtenciones || 0;
               const totalFacturadoGeneral = resumen.totalFacturadoGeneral || 0;
               const totalDebitadoGeneral = resumen.totalDebitadoGeneral || 0;
               const totalNeto = totalFacturadoGeneral - totalDebitadoGeneral;
               const cantidadDebitos = resumen.cantidadDebitos || 0;
 
-              // 2. Insertar la cabecera del cierre con todos los indicadores obligatorios
+              // 2. Insertar cabecera con totales
               const resultCierre = await queryTrans(`
                 INSERT INTO cierres 
                 (idUsuario, idEfector, periodo, totalFacturadoGeneral, totalDebitadoGeneral, totalNeto, cantidadAtenciones, cantidadDebitos, fechaCierre) 
@@ -106,7 +109,7 @@ const Cierre = {
 
               const idCierre = resultCierre.insertId;
 
-              // 3. Insertar los detalles masivamente para este cierre (usando tu misma consulta eficiente)
+              // 3. Insertar detalles
               await queryTrans(`
                 INSERT INTO cierres_detalle (idCierre, idAtencion, tieneDebito, totalDebito, motivos)
                 SELECT 
