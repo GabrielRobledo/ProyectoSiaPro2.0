@@ -1,4 +1,4 @@
-const { Cierre } = require('../models/cierreModels');
+const Cierre  = require('../models/cierreModels');
 
 const crearCierreConDetalle = (idEfector, periodo, idUsuario) => {
   return new Promise((resolve, reject) => {
