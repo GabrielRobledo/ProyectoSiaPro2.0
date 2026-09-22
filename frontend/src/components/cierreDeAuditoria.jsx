@@ -13,7 +13,8 @@ import {
   Col,
   Statistic,
   Table as AntTable,
-  Space
+  Space,
+  Modal
 } from 'antd';
 import {
   useReactTable,
@@ -336,7 +337,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       </div>
 
       {/* ── MODAL DE ANT DESIGN CON EL DETALLE DEL CIERRE ── */}
-      <AntModal
+      <Modal
         title={`Detalle Consolidado del Cierre #${cierreSeleccionadoId || ''}`}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
@@ -385,7 +386,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
             </table>
           </div>
         )}
-      </AntModal>
+      </Modal>
             </>
           )}
         </>
