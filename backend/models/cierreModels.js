@@ -101,15 +101,15 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
 
             const idCierre = resultCierre.insertId;
 
-            // 3. Insertar detalles
+            // 3. Insertar detalles (compatible con ONLY_FULL_GROUP_BY)
             await queryTrans(`
               INSERT INTO cierres_detalle (idCierre, idAtencion, tieneDebito, totalDebito, motivos)
               SELECT 
                 ? AS idCierre,
                 a.idAtencion,
-                CASE WHEN da.importe > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
-                IFNULL(da.importe, 0) AS totalDebito,
-                IF(da.importe > 0 AND m.motivo IS NOT NULL, m.motivo, NULL) AS motivos
+                CASE WHEN MAX(da.importe) > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
+                IFNULL(MAX(da.importe), 0) AS totalDebito,
+                MAX(IF(da.importe > 0 AND m.motivo IS NOT NULL, m.motivo, NULL)) AS motivos
               FROM atenciones a
               JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
               LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
