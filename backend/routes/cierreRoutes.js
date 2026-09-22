@@ -7,6 +7,7 @@ const cierreController = require('../controllers/cierreControllers');
 router.post('/cierres', cierreController.crearCierre);
 router.get('/efectores-con-cierre', cierreController.efectoresConCierre);
 router.get('/listarCierres', cierreController.listarCierres);
+router.post('/cierres-masivos', cierreController.crearCierreMasivo);
 
 
 module.exports = router;

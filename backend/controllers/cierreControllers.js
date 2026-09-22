@@ -47,4 +47,27 @@ const listarCierres = (req, res) => {
   });
 };
 
-module.exports = { crearCierre, efectoresConCierre, listarCierres };
+const crearCierreMasivo = async (req, res) => {
+  try {
+    const { periodo, efectoresIds, idUsuario } = req.body;
+
+    if (!periodo || !efectoresIds || !Array.isArray(efectoresIds) || efectoresIds.length === 0 || !idUsuario) {
+      return res.status(400).json({ error: 'Faltan datos requeridos o la lista de efectores está vacía.' });
+    }
+
+    const cierres = await CierreService.crearCierreMasivo(periodo, efectoresIds, idUsuario);
+
+    res.status(201).json({ 
+      message: 'Cierre general ejecutado correctamente', 
+      totalCierres: cierres.length,
+      cierres 
+    });
+  } catch (err) {
+    console.error('Error en crearCierreMasivo:', err);
+    res.status(500).json({ error: 'Error al procesar el cierre general en la base de datos' });
+  }
+};
+
+// Asegúrate de exportarlo junto a los demás
+module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo };
+
