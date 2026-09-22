@@ -151,4 +151,4 @@ const Cierre = {
 
 
 
-module.exports = { Cierre };
+module.exports = Cierre;
