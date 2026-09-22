@@ -12,7 +12,8 @@ import {
   Row,
   Col,
   Statistic,
-  Table as AntTable
+  Table as AntTable,
+  Space
 } from 'antd';
 import {
   useReactTable,
