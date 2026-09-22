@@ -4,7 +4,7 @@ import { useUser } from './contextUsers';
 const RutaPorRol = ({ rolesPermitidos = [] }) => {
   const { user } = useUser();
 
-  if (!user || !user.rol) {
+  if (!user || !user?.rol) {
     return <Navigate to="/login" replace />;
   }
 
