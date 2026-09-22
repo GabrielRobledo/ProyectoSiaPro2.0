@@ -169,230 +169,231 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       setLoadingDetalle(false);
     }
   };
-
   return (
-    <div style={{ maxWidth: 1100, margin: '40px auto', padding: 32, background: '#fff', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.05)' }}>
-      
-      <Space align="center" size="middle" style={{ marginBottom: 24 }}>
-        <DashboardOutlined style={{ fontSize: '28px', color: '#1890ff' }} />
-        <div>
-          <Title level={3} style={{ margin: 0 }}>Cierre General de Auditoría por Periodo</Title>
-          <Text type="secondary">Panel de control y consolidación de cierres hospitalarios mensuales.</Text>
-        </div>
-      </Space>
-
-      <Divider />
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
-      ) : (
-        <>
-          {/* Selección de Periodo */}
-          <div style={{ marginBottom: 24, maxWidth: '400px' }}>
-            <label style={{ fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Seleccionar Período a Cerrar:</label>
-            <Select
-              placeholder="Ej: 2024-08"
-              value={periodoSeleccionado || undefined}
-              onChange={(value) => setPeriodoSeleccionado(value)}
-              style={{ width: '100%' }}
-            >
-              {todosLosPeriodos.map((p, index) => (
-                <Option key={index} value={p}>{p}</Option>
-              ))}
-            </Select>
+      <div style={{ maxWidth: 1100, margin: '40px auto', padding: 32, background: '#fff', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.05)' }}>
+        
+        <Space align="center" size="middle" style={{ marginBottom: 24 }}>
+          <DashboardOutlined style={{ fontSize: '28px', color: '#1890ff' }} />
+          <div>
+            <Title level={3} style={{ margin: 0 }}>Cierre General de Auditoría por Periodo</Title>
+            <Text type="secondary">Panel de control y consolidación de cierres hospitalarios mensuales.</Text>
           </div>
+        </Space>
 
-          {periodoSeleccionado && (
-            <>
-              {/* Resumen Estadístico de la Situación del Periodo */}
-              <Row gutter={16} style={{ marginBottom: 24 }}>
-                <Col span={12}>
-                  <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
-                    <Statistic 
-                      title="Efectores Listos (Auditados)" 
-                      value={efectoresAuditadosPendientes.length} 
-                      valueStyle={{ color: '#3f8600' }}
-                      prefix={<CheckCircleOutlined />} 
-                    />
-                  </Card>
-                </Col>
-                <Col span={12}>
-                  <Card style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}>
-                    <Statistic 
-                      title="Efectores Sin Auditoría (No llegaron)" 
-                      value={efectoresNoAuditados.length} 
-                      valueStyle={{ color: '#faad14' }}
-                      prefix={<WarningOutlined />} 
-                    />
-                  </Card>
-                </Col>
-              </Row>
+        <Divider />
 
-              {/* Tabla de Efectores Listos para el Cierre */}
-              <div style={{ marginBottom: 24 }}>
-                <Title level={4} style={{ color: '#333' }}>Efectores Auditados pendientes de Cierre</Title>
-                <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      {table.getHeaderGroups().map(headerGroup => (
-                        <tr key={headerGroup.id} style={{ background: '#fafafa' }}>
-                          {headerGroup.headers.map(header => (
-                            <th key={header.id} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </th>
-                          ))}
-                        </tr>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+        ) : (
+          <>
+            {/* Selección de Periodo */}
+            <div style={{ marginBottom: 24, maxWidth: '400px' }}>
+              <label style={{ fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Seleccionar Período a Cerrar:</label>
+              <Select
+                placeholder="Ej: 2026-09"
+                value={periodoSeleccionado || undefined}
+                onChange={(value) => setPeriodoSeleccionado(value)}
+                style={{ width: '100%' }}
+              >
+                {todosLosPeriodos.map((p, index) => (
+                  <Option key={index} value={p}>{p}</Option>
+                ))}
+              </Select>
+            </div>
+
+            {periodoSeleccionado && (
+              <>
+                {/* Resumen Estadístico de la Situación del Periodo */}
+                <Row gutter={16} style={{ marginBottom: 24 }}>
+                  <Col span={12}>
+                    <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
+                      <Statistic 
+                        title="Efectores Listos (Auditados)" 
+                        value={efectoresAuditadosPendientes.length} 
+                        valueStyle={{ color: '#3f8600' }}
+                        prefix={<CheckCircleOutlined />} 
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={12}>
+                    <Card style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}>
+                      <Statistic 
+                        title="Efectores Sin Auditoría (No llegaron)" 
+                        value={efectoresNoAuditados.length} 
+                        valueStyle={{ color: '#faad14' }}
+                        prefix={<WarningOutlined />} 
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+
+                {/* Tabla de Efectores Listos para el Cierre */}
+                <div style={{ marginBottom: 24 }}>
+                  <Title level={4} style={{ color: '#333' }}>Efectores Auditados pendientes de Cierre</Title>
+                  <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        {table.getHeaderGroups().map(headerGroup => (
+                          <tr key={headerGroup.id} style={{ background: '#fafafa' }}>
+                            {headerGroup.headers.map(header => (
+                              <th key={header.id} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                              </th>
+                            ))}
+                          </tr>
+                        ))}
+                      </thead>
+                      <tbody>
+                        {table.getRowModel().rows.length ? (
+                          table.getRowModel().rows.map(row => (
+                            <tr key={row.id}>
+                              {row.getVisibleCells().map(cell => (
+                                <td key={cell.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                              ))}
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={columns.length} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                              No hay efectores pendientes de cierre para este período.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Listado resumido de los que NO llegaron */}
+                {efectoresNoAuditados.length > 0 && (
+                  <div style={{ marginBottom: 24, padding: '16px', background: '#fff9f6', borderRadius: '8px', border: '1px solid #ffd8c2' }}>
+                    <Text strong style={{ color: '#d4380d' }}>Atención: Los siguientes efectores no registran auditorías finalizadas en este periodo y quedarán excluidos del cierre general:</Text>
+                    <ul style={{ margin: '8px 0 0 20px', color: '#595959' }}>
+                      {efectoresNoAuditados.map(ef => (
+                        <li key={ef.idEfector}>{ef.RazonSocial} (Cod: {ef.codPrestador})</li>
                       ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Botón de Ejecución del Cierre General */}
+                <Button
+                  type="primary"
+                  size="large"
+                  block
+                  disabled={efectoresAuditadosPendientes.length === 0}
+                  onClick={generarCierreGeneral}
+                  style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
+                >
+                  🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
+                </Button>
+              </>
+            )}
+
+            {/* ── HISTORIAL DE CIERRES REALIZADOS (AHORA FUERA DEL CONDICIONAL) ── */}
+            <Divider style={{ margin: '40px 0 20px 0' }} />
+            <Title level={4} style={{ color: '#333', marginBottom: 16 }}>Historial de Cierres Generales</Title>
+            
+            <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px', background: '#fafafa' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f0f0f0' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID Cierre</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Período</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Efector / Hospital</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usuario</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cierres.length ? (
+                    cierres.map(cierre => (
+                      <tr key={cierre.idCierre} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff' }}>
+                        <td style={{ padding: '12px 16px' }}>#{cierre.idCierre}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{cierre.periodo}</td>
+                        <td style={{ padding: '12px 16px' }}>{cierre.RazonSocial}</td>
+                        <td style={{ padding: '12px 16px' }}>{cierre.usuario}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <Button 
+                            type="primary" 
+                            ghost 
+                            size="small"
+                            onClick={() => verDetalleCierre(cierre.idCierre)}
+                          >
+                            Ver Totales / Detalle
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#999', background: '#fff' }}>
+                        No se registran cierres generales previos.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── MODAL DE DETALLE DEL CIERRE ── */}
+            <Modal
+              title={`Detalle Consolidado del Cierre #${cierreSeleccionadoId || ''}`}
+              open={modalVisible}
+              onCancel={() => setModalVisible(false)}
+              footer={[
+                <Button key="back" type="primary" onClick={() => setModalVisible(false)}>
+                  Cerrar
+                </Button>
+              ]}
+              width={900}
+            >
+              {loadingDetalle ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}><Spin size="large" /></div>
+              ) : (
+                <div style={{ overflowX: 'auto', marginTop: 16 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
+                        <th style={{ padding: '10px', textAlign: 'left' }}>Hospital / Efector</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Atenciones</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Total Facturado</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Total Debitado</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Total Neto</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>Débitos</th>
+                      </tr>
                     </thead>
                     <tbody>
-                      {table.getRowModel().rows.length ? (
-                        table.getRowModel().rows.map(row => (
-                          <tr key={row.id}>
-                            {row.getVisibleCells().map(cell => (
-                              <td key={cell.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </td>
-                            ))}
+                      {detalleCierre.length > 0 ? (
+                        detalleCierre.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '10px', fontWeight: '500' }}>{item.hospital}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_atenciones}</td>
+                            <td style={{ padding: '10px', textAlign: 'right' }}>${Number(item.total_facturado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '10px', textAlign: 'right', color: '#cf1322' }}>${Number(item.total_debitado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '10px', textAlign: 'right', color: '#3f8600', fontWeight: 'bold' }}>${Number(item.total_neto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_debitos}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={columns.length} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                            No hay efectores pendientes de cierre para este período.
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                            No hay datos detallados para este cierre.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-              </div>
-
-              {/* Listado resumido de los que NO llegaron */}
-              {efectoresNoAuditados.length > 0 && (
-                <div style={{ marginBottom: 24, padding: '16px', background: '#fff9f6', borderRadius: '8px', border: '1px solid #ffd8c2' }}>
-                  <Text strong style={{ color: '#d4380d' }}>Atención: Los siguientes efectores no registran auditorías finalizadas en este periodo y quedarán excluidos del cierre general:</Text>
-                  <ul style={{ margin: '8px 0 0 20px', color: '#595959' }}>
-                    {efectoresNoAuditados.map(ef => (
-                      <li key={ef.idEfector}>{ef.RazonSocial} (Cod: {ef.codPrestador})</li>
-                    ))}
-                  </ul>
-                </div>
               )}
+            </Modal>
 
-              {/* Botón de Ejecución del Cierre General */}
-              <Button
-                type="primary"
-                size="large"
-                block
-                disabled={efectoresAuditadosPendientes.length === 0}
-                onClick={generarCierreGeneral}
-                style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
-              >
-                🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
-              </Button>
-{/* ── HISTORIAL DE CIERRES REALIZADOS ── */}
-      <Divider style={{ margin: '40px 0 20px 0' }} />
-      <Title level={4} style={{ color: '#333', marginBottom: 16 }}>Historial de Cierres Generales</Title>
-      
-      <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px', background: '#fafafa' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f0f0f0' }}>
-              <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID Cierre</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Período</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Efector / Hospital</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usuario</th>
-              <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cierres.length ? (
-              cierres.map(cierre => (
-                <tr key={cierre.idCierre} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff' }}>
-                  <td style={{ padding: '12px 16px' }}>#{cierre.idCierre}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{cierre.periodo}</td>
-                  <td style={{ padding: '12px 16px' }}>{cierre.RazonSocial}</td>
-                  <td style={{ padding: '12px 16px' }}>{cierre.usuario}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <Button 
-                      type="primary" 
-                      ghost 
-                      size="small"
-                      onClick={() => verDetalleCierre(cierre.idCierre)}
-                    >
-                      Ver Totales / Detalle
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#999', background: '#fff' }}>
-                  No se registran cierres generales previos.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── MODAL DE ANT DESIGN CON EL DETALLE DEL CIERRE ── */}
-      <Modal
-        title={`Detalle Consolidado del Cierre #${cierreSeleccionadoId || ''}`}
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        footer={[
-          <Button key="back" type="primary" onClick={() => setModalVisible(false)}>
-            Cerrar
-          </Button>
-        ]}
-        width={900}
-      >
-        {loadingDetalle ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}><Spin size="large" /></div>
-        ) : (
-          <div style={{ overflowX: 'auto', marginTop: 16 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead>
-                <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
-                  <th style={{ padding: '10px', textAlign: 'left' }}>Hospital / Efector</th>
-                  <th style={{ padding: '10px', textAlign: 'center' }}>Atenciones</th>
-                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Facturado</th>
-                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Debitado</th>
-                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Neto</th>
-                  <th style={{ padding: '10px', textAlign: 'center' }}>Débitos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detalleCierre.length > 0 ? (
-                  detalleCierre.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '10px', fontWeight: '500' }}>{item.hospital}</td>
-                      <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_atenciones}</td>
-                      <td style={{ padding: '10px', textAlign: 'right' }}>${Number(item.total_facturado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '10px', textAlign: 'right', color: '#cf1322' }}>${Number(item.total_debitado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '10px', textAlign: 'right', color: '#3f8600', fontWeight: 'bold' }}>${Number(item.total_neto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_debitos}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                      No hay datos detallados para este cierre.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          </>
         )}
-      </Modal>
-            </>
-          )}
-        </>
-      )}
-    </div>
-  );
+      </div>
+    );
 };
 
 export default CierreDeAuditoria;
