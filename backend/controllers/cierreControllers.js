@@ -68,6 +68,27 @@ const crearCierreMasivo = async (req, res) => {
   }
 };
 
+const obtenerDetalleCierre = async (req, res) => {
+  try {
+    const { idcierre } = req.params;
+
+    if (!idcierre) {
+      return res.status(400).json({ error: 'Falta el ID del cierre' });
+    }
+
+    // Llamas al servicio encargado de buscar el detalle agrupado por efector/hospital
+    const detalle = await CierreService.obtenerDetalleCierrePorId(idcierre);
+
+    res.status(200).json({ 
+      success: true, 
+      data: detalle 
+    });
+  } catch (err) {
+    console.error('Error en obtenerDetalleCierre:', err);
+    res.status(500).json({ error: 'Error al obtener el detalle del cierre' });
+  }
+};
+
 // Asegúrate de exportarlo junto a los demás
-module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo };
+module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo, obtenerDetalleCierre };
 

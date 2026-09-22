@@ -8,6 +8,7 @@ router.post('/cierres', cierreController.crearCierre);
 router.get('/efectores-con-cierre', cierreController.efectoresConCierre);
 router.get('/listarCierres', cierreController.listarCierres);
 router.post('/cierres-masivos', cierreController.crearCierreMasivo);
+router.get('/:idcierre/detalle', cierreController.obtenerDetalleCierre);
 
 
 module.exports = router;

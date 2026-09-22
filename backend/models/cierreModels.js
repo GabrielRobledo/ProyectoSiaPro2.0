@@ -138,8 +138,28 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
         }
       });
     });
+  },
+
+  // Nueva función para obtener el resumen/detalle de un cierre por efector para la vista de React
+  obtenerDetalleCierrePorId(idCierre, callback) {
+    const sql = `
+      SELECT 
+          \`e\`.\`nombre\` AS \`hospital\`,
+          \`c\`.\`cantidadAtenciones\` AS \`cantidad_atenciones\`,
+          \`c\`.\`totalFacturadoGeneral\` AS \`total_facturado\`,
+          \`c\`.\`totalDebitadoGeneral\` AS \`total_debitado\`,
+          \`c\`.\`totalNeto\` AS \`total_neto\`,
+          \`c\`.\`cantidadDebitos\` AS \`cantidad_debitos\`
+      FROM \`cierres\` AS \`c\`
+      JOIN \`efectores\` AS \`e\` ON \`c\`.\`idEfector\` = \`e\`.\`idefector\`
+      WHERE \`c\`.\`idcierre\` = ?
+    `;
+    db.query(sql, [idCierre], callback);
   }
+  
 };
+
+
 
 
 

@@ -36,6 +36,10 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [cierreSeleccionadoId, setCierreSeleccionadoId] = useState(null);
+  const [detalleCierre, setDetalleCierre] = useState([]);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -146,6 +150,24 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  const verDetalleCierre = async (idCierre) => {
+    setCierreSeleccionadoId(idCierre);
+    setModalVisible(true);
+    setLoadingDetalle(true);
+
+    try {
+      // Petición al endpoint que creamos en el backend
+      const response = await axios.get(`${API_URL}/api/cierres/${idCierre}/detalle`);
+      // O si tu backend devuelve directamente el array o dentro de una propiedad data:
+      setDetalleCierre(response.data.data || response.data);
+    } catch (error) {
+      console.error('Error al obtener el detalle del cierre:', error);
+      Swal.fire('❌ Error', 'No se pudo cargar el detalle del cierre.', 'error');
+    } finally {
+      setLoadingDetalle(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 1100, margin: '40px auto', padding: 32, background: '#fff', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.05)' }}>
@@ -267,6 +289,103 @@ const CierreDeAuditoria = ({ idUsuario }) => {
               >
                 🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
               </Button>
+{/* ── HISTORIAL DE CIERRES REALIZADOS ── */}
+      <Divider style={{ margin: '40px 0 20px 0' }} />
+      <Title level={4} style={{ color: '#333', marginBottom: 16 }}>Historial de Cierres Generales</Title>
+      
+      <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px', background: '#fafafa' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#f0f0f0' }}>
+              <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID Cierre</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Período</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Efector / Hospital</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usuario</th>
+              <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cierres.length ? (
+              cierres.map(cierre => (
+                <tr key={cierre.idCierre} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff' }}>
+                  <td style={{ padding: '12px 16px' }}>#{cierre.idCierre}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{cierre.periodo}</td>
+                  <td style={{ padding: '12px 16px' }}>{cierre.RazonSocial}</td>
+                  <td style={{ padding: '12px 16px' }}>{cierre.usuario}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <Button 
+                      type="primary" 
+                      ghost 
+                      size="small"
+                      onClick={() => verDetalleCierre(cierre.idCierre)}
+                    >
+                      Ver Totales / Detalle
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#999', background: '#fff' }}>
+                  No se registran cierres generales previos.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── MODAL DE ANT DESIGN CON EL DETALLE DEL CIERRE ── */}
+      <AntModal
+        title={`Detalle Consolidado del Cierre #${cierreSeleccionadoId || ''}`}
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={[
+          <Button key="back" type="primary" onClick={() => setModalVisible(false)}>
+            Cerrar
+          </Button>
+        ]}
+        width={900}
+      >
+        {loadingDetalle ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}><Spin size="large" /></div>
+        ) : (
+          <div style={{ overflowX: 'auto', marginTop: 16 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Hospital / Efector</th>
+                  <th style={{ padding: '10px', textAlign: 'center' }}>Atenciones</th>
+                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Facturado</th>
+                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Debitado</th>
+                  <th style={{ padding: '10px', textAlign: 'right' }}>Total Neto</th>
+                  <th style={{ padding: '10px', textAlign: 'center' }}>Débitos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detalleCierre.length > 0 ? (
+                  detalleCierre.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '10px', fontWeight: '500' }}>{item.hospital}</td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_atenciones}</td>
+                      <td style={{ padding: '10px', textAlign: 'right' }}>${Number(item.total_facturado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '10px', textAlign: 'right', color: '#cf1322' }}>${Number(item.total_debitado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '10px', textAlign: 'right', color: '#3f8600', fontWeight: 'bold' }}>${Number(item.total_neto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_debitos}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                      No hay datos detallados para este cierre.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </AntModal>
             </>
           )}
         </>
