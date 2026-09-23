@@ -98,11 +98,17 @@ const CierreDeAuditoria = ({ idUsuario }) => {
   }, [periodoSeleccionado, auditorias, efectores]);
 
   const generarCierreGeneral = async () => {
-    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0) return;
+    // Respaldo por si la prop viene vacía o nula
+    const usuarioIdFinal = idUsuario || localStorage.getItem('idUsuario') || JSON.parse(localStorage.getItem('usuario'))?.idUsuario;
+
+    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !usuarioIdFinal) {
+      Swal.fire('❌ Error', 'No se pudo identificar el usuario actual.', 'error');
+      return;
+    }
 
     const confirmacion = await Swal.fire({
       title: '¿Confirmar Cierre General?',
-      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores auditados en el periodo ${periodoSeleccionado}.`,
+      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores en el periodo ${periodoSeleccionado}.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, generar cierre general',
@@ -112,11 +118,10 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     if (!confirmacion.isConfirmed) return;
 
     try {
-      // Envias al backend el periodo y la lista de IDs de efectores a cerrar masivamente
       await axios.post(`${API_URL}/api/cierres-masivos`, {
         periodo: periodoSeleccionado,
         efectoresIds: efectoresAuditadosPendientes.map(e => e.idEfector),
-        idUsuario,
+        idUsuario: Number(usuarioIdFinal), // Se envía seguro y convertido a número
       });
 
       Swal.fire('✅ Cierre General Exitoso', 'Los cierres del periodo se generaron correctamente.', 'success');
