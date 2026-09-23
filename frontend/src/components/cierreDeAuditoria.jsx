@@ -159,7 +159,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
     try {
       // Petición al endpoint que creamos en el backend
-      const response = await axios.get(`${API_URL}/api/cierres/${idCierre}/detalle`);
+      const response = await axios.get(`${API_URL}/api/${idCierre}/detalle`);
       // O si tu backend devuelve directamente el array o dentro de una propiedad data:
       setDetalleCierre(response.data.data || response.data);
     } catch (error) {
