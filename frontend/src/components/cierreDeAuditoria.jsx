@@ -67,9 +67,9 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
   const cargarCierres = () => {
     axios
-      .get(`${API_URL}/api/listarCierres`)
+      .get(`${API_URL}/api/listarCierresGenerales`)
       .then((res) => setCierres(res.data))
-      .catch((err) => console.error('Error al obtener cierres:', err));
+      .catch((err) => console.error('Error al obtener cierres generales:', err));
   };
 
   // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
@@ -292,7 +292,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
               </>
             )}
 
-            {/* ── HISTORIAL DE CIERRES REALIZADOS (AHORA FUERA DEL CONDICIONAL) ── */}
+            {/* ── HISTORIAL DE CIERRES GENERALES REALIZADOS ── */}
             <Divider style={{ margin: '40px 0 20px 0' }} />
             <Title level={4} style={{ color: '#333', marginBottom: 16 }}>Historial de Cierres Generales</Title>
             
@@ -300,9 +300,10 @@ const CierreDeAuditoria = ({ idUsuario }) => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f0f0f0' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID Cierre</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID Cierre General</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left' }}>Período</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Efector / Hospital</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>Fecha y Hora</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Total Atenciones</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left' }}>Usuario</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
                   </tr>
@@ -310,26 +311,27 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                 <tbody>
                   {cierres.length ? (
                     cierres.map(cierre => (
-                      <tr key={cierre.idCierre} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff' }}>
-                        <td style={{ padding: '12px 16px' }}>#{cierre.idCierre}</td>
+                      <tr key={cierre.idCierreGeneral} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff' }}>
+                        <td style={{ padding: '12px 16px' }}>#{cierre.idCierreGeneral}</td>
                         <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{cierre.periodo}</td>
-                        <td style={{ padding: '12px 16px' }}>{cierre.RazonSocial}</td>
+                        <td style={{ padding: '12px 16px' }}>{new Date(cierre.fecha_cierre).toLocaleString()}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>{cierre.total_atenciones}</td>
                         <td style={{ padding: '12px 16px' }}>{cierre.usuario}</td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                           <Button 
                             type="primary" 
                             ghost 
                             size="small"
-                            onClick={() => verDetalleCierre(cierre.idCierre)}
+                            onClick={() => verDetalleCierre(cierre.idCierreGeneral)}
                           >
-                            Ver Totales / Detalle
+                            Ver Hospitales / Detalle
                           </Button>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#999', background: '#fff' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#999', background: '#fff' }}>
                         No se registran cierres generales previos.
                       </td>
                     </tr>
@@ -340,7 +342,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
             {/* ── MODAL DE DETALLE DEL CIERRE ── */}
             <Modal
-              title={`Detalle Consolidado del Cierre #${cierreSeleccionadoId || ''}`}
+              title={`Detalle Consolidado del Cierre General #${cierreSeleccionadoId || ''}`}
               open={modalVisible}
               onCancel={() => setModalVisible(false)}
               footer={[
@@ -358,11 +360,10 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                     <thead>
                       <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
                         <th style={{ padding: '10px', textAlign: 'left' }}>Hospital / Efector</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Atenciones</th>
                         <th style={{ padding: '10px', textAlign: 'right' }}>Total Facturado</th>
                         <th style={{ padding: '10px', textAlign: 'right' }}>Total Debitado</th>
                         <th style={{ padding: '10px', textAlign: 'right' }}>Total Neto</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Débitos</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>¿Tiene Débito?</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -370,16 +371,21 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                         detalleCierre.map((item, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
                             <td style={{ padding: '10px', fontWeight: '500' }}>{item.hospital}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_atenciones}</td>
                             <td style={{ padding: '10px', textAlign: 'right' }}>${Number(item.total_facturado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                             <td style={{ padding: '10px', textAlign: 'right', color: '#cf1322' }}>${Number(item.total_debitado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                             <td style={{ padding: '10px', textAlign: 'right', color: '#3f8600', fontWeight: 'bold' }}>${Number(item.total_neto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
-                            <td style={{ padding: '10px', textAlign: 'center' }}>{item.cantidad_debitos}</td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              {item.cantidad_debitos === 1 ? (
+                                <span style={{ color: '#cf1322', fontWeight: 'bold' }}>Sí</span>
+                              ) : (
+                                <span style={{ color: '#52c41a' }}>No</span>
+                              )}
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                          <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
                             No hay datos detallados para este cierre.
                           </td>
                         </tr>

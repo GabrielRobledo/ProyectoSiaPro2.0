@@ -28,6 +28,12 @@ const listarCierres = (callback) => {
   Cierre.listarCierres(callback);
 };
 
+const listarCierresGenerales = (callback) => {
+  Cierre.listarCierresGenerales(callback);
+};
+
+
+
 // Modificado para invocar al modelo en lugar de usar db.query directo aquí
 const obtenerDetalleCierrePorId = (idcierre) => {
   return new Promise((resolve, reject) => {
@@ -38,4 +44,4 @@ const obtenerDetalleCierrePorId = (idcierre) => {
   });
 };
 
-module.exports = { crearCierreConDetalle, listarCierres, crearCierreMasivo, obtenerDetalleCierrePorId };
+module.exports = { crearCierreConDetalle, listarCierres, crearCierreMasivo, obtenerDetalleCierrePorId, listarCierresGenerales };

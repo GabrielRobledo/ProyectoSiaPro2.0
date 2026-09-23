@@ -33,26 +33,29 @@ const Cierre = {
         console.error('Error en guardarDetalle:', err);
         return callback(err);
       }
-      console.log('Resultado guardarDetalle:', result);
       callback(null, result);
     });
   },
 
-  listarCierres(callback) {
-    const sql = `
-      SELECT c.idCierre, c.periodo, c.idEfector, e.RazonSocial, u.nombre AS usuario
-      FROM cierres c
-      JOIN efectores e ON c.idEfector = e.idEfector
-      JOIN usuarios u ON c.idUsuario = u.idUsuario
-      ORDER BY c.periodo DESC, e.RazonSocial;
-    `;
-    db.query(sql, (err, results) => {
-      if (err) return callback(err);
-      callback(null, results);
-    });
-  },
-  // Dentro de tu archivo de modelo/servicio (ej: cierreModel.js o cierreServices.js)
+  listarCierresGenerales(callback) {
+      const sql = `
+        SELECT 
+          cg.id AS idCierreGeneral, 
+          cg.periodo, 
+          cg.fecha_cierre, 
+          cg.total_atenciones, 
+          u.nombre AS usuario
+        FROM cierres_generales cg
+        JOIN usuarios u ON cg.idUsuario = u.idUsuario
+        ORDER BY cg.periodo DESC, cg.fecha_cierre DESC;
+      `;
+      db.query(sql, (err, results) => {
+        if (err) return callback(err);
+        callback(null, results);
+      });
+    },
 
+  // ── CIERRE MASIVO DUAL (MANTIENE LAS VIEJAS Y LLENA LAS NUEVAS) ──
   crearCierreMasivo(periodo, efectoresIds, idUsuario) {
     return new Promise((resolve, reject) => {
       db.beginTransaction(async (err) => {
@@ -68,66 +71,102 @@ const Cierre = {
             });
           });
 
+          // 1. Crear la cabecera general en la tabla nueva `cierres_generales`
+          const resultCierreGen = await queryTrans(`
+            INSERT INTO cierres_generales 
+            (periodo, fecha_cierre, idUsuario, total_filas, total_atenciones, observaciones) 
+            VALUES (?, NOW(), ?, ?, 0, ?)
+          `, [periodo, idUsuario, efectoresIds.length, `Cierre general ejecutado para el periodo ${periodo}`]);
+
+          const idCierreGeneral = resultCierreGen.insertId;
+          let totalAtencionesGeneral = 0;
+
           for (const idEfector of efectoresIds) {
             
-            // 1. Obtener totales de atenciones y facturación general sin cruzar con detalles para evitar duplicidad
-            const atencionesRows = await queryTrans(`
+            // A. PROCESO TRADICIONAL (Tablas viejas: `cierres` y `cierres_detalle`)
+            const resumenRows = await queryTrans(`
               SELECT 
                 COUNT(DISTINCT a.idAtencion) AS cantidadAtenciones,
-                SUM(IFNULL(a.valorTotal, 0)) AS totalFacturadoGeneral
+                SUM(IFNULL(a.valorTotal, 0)) AS totalFacturadoGeneral,
+                SUM(IFNULL(da.importe, 0)) AS totalDebitadoGeneral,
+                SUM(CASE WHEN da.importe > 0 THEN 1 ELSE 0 END) AS cantidadDebitos
               FROM atenciones a
               JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
+              LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
               WHERE a.idEfector = ?
             `, [periodo, idEfector]);
 
-            const resumenAtenciones = atencionesRows[0] || {};
-            const cantidadAtenciones = resumenAtenciones.cantidadAtenciones || 0;
-            const totalFacturadoGeneral = resumenAtenciones.totalFacturadoGeneral || 0;
-
-            // 2. Obtener totales de débitos de forma independiente
-            const debitosRows = await queryTrans(`
-              SELECT 
-                COUNT(DISTINCT da.idAtencion) AS cantidadDebitos,
-                SUM(IFNULL(da.importe, 0)) AS totalDebitadoGeneral
-              FROM \`detalle-auditoria\` da
-              JOIN atenciones a ON da.idAtencion = a.idAtencion
-              JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
-              WHERE a.idEfector = ? AND da.importe > 0
-            `, [periodo, idEfector]);
-
-            const resumenDebitos = debitosRows[0] || {};
-            const totalDebitadoGeneral = resumenDebitos.totalDebitadoGeneral || 0;
-            const cantidadDebitos = resumenDebitos.cantidadDebitos || 0;
+            const resumen = resumenRows[0] || {};
+            const cantidadAtenciones = resumen.cantidadAtenciones || 0;
+            const totalFacturadoGeneral = resumen.totalFacturadoGeneral || 0;
+            const totalDebitadoGeneral = resumen.totalDebitadoGeneral || 0;
             const totalNeto = totalFacturadoGeneral - totalDebitadoGeneral;
+            const cantidadDebitos = resumen.cantidadDebitos || 0;
 
-            // 3. Insertar la cabecera del cierre
-            const resultCierre = await queryTrans(`
+            totalAtencionesGeneral += cantidadAtenciones;
+
+            // Insertar en tabla vieja `cierres`
+            const resultCierreViejo = await queryTrans(`
               INSERT INTO cierres 
               (idUsuario, idEfector, periodo, totalFacturadoGeneral, totalDebitadoGeneral, totalNeto, cantidadAtenciones, cantidadDebitos, fechaCierre) 
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
             `, [idUsuario, idEfector, periodo, totalFacturadoGeneral, totalDebitadoGeneral, totalNeto, cantidadAtenciones, cantidadDebitos]);
 
-            const idCierre = resultCierre.insertId;
+            const idCierreViejo = resultCierreViejo.insertId;
 
-            // 4. Insertar los detalles agrupados por atención (usando GROUP_CONCAT para agrupar motivos si hay varios)
+            // Insertar en tabla vieja `cierres_detalle`
             await queryTrans(`
               INSERT INTO cierres_detalle (idCierre, idAtencion, tieneDebito, totalDebito, motivos)
               SELECT 
                 ? AS idCierre,
                 a.idAtencion,
-                CASE WHEN SUM(IFNULL(da.importe, 0)) > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
-                SUM(IFNULL(da.importe, 0)) AS totalDebito,
-                IFNULL(GROUP_CONCAT(DISTINCT m.motivo SEPARATOR ', '), '') AS motivos
+                CASE WHEN MAX(da.importe) > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
+                IFNULL(MAX(da.importe), 0) AS totalDebito,
+                IFNULL(MAX(IF(da.importe > 0, m.motivo, NULL)), '') AS motivos
               FROM atenciones a
               JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
               LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
               LEFT JOIN motivos m ON da.idMotivo = m.idMotivo
               WHERE a.idEfector = ?
               GROUP BY a.idAtencion
-            `, [idCierre, periodo, idEfector]);
+            `, [idCierreViejo, periodo, idEfector]);
 
-            cierresCreados.push({ idCierre, idEfector, totalNeto });
+
+            // B. PROCESO NUEVO (Tablas solicitadas: `atenciones_cierre`)
+            // Calculamos los montos específicos para este efector en este período
+            const montosEfectorRows = await queryTrans(`
+              SELECT 
+                SUM(IFNULL(a.valorTotal, 0)) AS monto_facturado,
+                SUM(IFNULL(da.importe, 0)) AS monto_debitado,
+                CASE WHEN SUM(IFNULL(da.importe, 0)) > 0 THEN 1 ELSE 0 END AS tiene_debito
+              FROM atenciones a
+              JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
+              LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
+              WHERE a.idEfector = ?
+            `, [periodo, idEfector]);
+
+            const montos = montosEfectorRows[0] || {};
+            const montoFacturado = montos.monto_facturado || 0;
+            const montoDebitado = montos.monto_debitado || 0;
+            const montoNeto = montoFacturado - montoDebitado;
+            const tieneDebito = montos.tiene_debito || 0;
+
+            // Insertar en la tabla nueva `atenciones_cierre` vinculada al idCierreGeneral
+            await queryTrans(`
+              INSERT INTO atenciones_cierre 
+              (idCierre, idEfector, monto_facturado, monto_debitado, monto_neto, tiene_debito) 
+              VALUES (?, ?, ?, ?, ?, ?)
+            `, [idCierreGeneral, idEfector, montoFacturado, montoDebitado, montoNeto, tieneDebito]);
+
+            cierresCreados.push({ idCierre: idCierreGeneral, idEfector, montoNeto });
           }
+
+          // Actualizar el total acumulado de atenciones en la cabecera `cierres_generales`
+          await queryTrans(`
+            UPDATE cierres_generales 
+            SET total_atenciones = ? 
+            WHERE id = ?
+          `, [totalAtencionesGeneral, idCierreGeneral]);
 
           db.commit((errCommit) => {
             if (errCommit) {
@@ -137,7 +176,7 @@ const Cierre = {
           });
 
         } catch (error) {
-          console.error('❌ Error crítico en transacción de cierre masivo:', error);
+          console.error('❌ Error en transacción de cierre masivo dual:', error);
           db.rollback(() => {
             reject(error);
           });
@@ -146,27 +185,21 @@ const Cierre = {
     });
   },
 
-  // Nueva función para obtener el resumen/detalle de un cierre por efector para la vista de React
   obtenerDetalleCierrePorId(idCierre, callback) {
     const sql = `
       SELECT 
-          \`e\`.\`nombre\` AS \`hospital\`,
-          \`c\`.\`cantidadAtenciones\` AS \`cantidad_atenciones\`,
-          \`c\`.\`totalFacturadoGeneral\` AS \`total_facturado\`,
-          \`c\`.\`totalDebitadoGeneral\` AS \`total_debitado\`,
-          \`c\`.\`totalNeto\` AS \`total_neto\`,
-          \`c\`.\`cantidadDebitos\` AS \`cantidad_debitos\`
-      FROM \`cierres\` AS \`c\`
-      JOIN \`efectores\` AS \`e\` ON \`c\`.\`idEfector\` = \`e\`.\`idefector\`
-      WHERE \`c\`.\`idcierre\` = ?
+          \`e\`.\`RazonSocial\` AS \`hospital\`,
+          \`ac\`.\`monto_facturado\` AS \`total_facturado\`,
+          \`ac\`.\`monto_debitado\` AS \`total_debitado\`,
+          \`ac\`.\`monto_neto\` AS \`total_neto\`,
+          \`ac\`.\`tiene_debito\` AS \`cantidad_debitos\`
+      FROM \`atenciones_cierre\` AS \`ac\`
+      JOIN \`efectores\` AS \`e\` ON \`ac\`.\`idEfector\` = \`e\`.\`idEfector\`
+      WHERE \`ac\`.\`idCierre\` = ?
     `;
     db.query(sql, [idCierre], callback);
   }
-  
 };
 
-
-
-
-
 module.exports = Cierre;
+

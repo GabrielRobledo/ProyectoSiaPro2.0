@@ -47,6 +47,16 @@ const listarCierres = (req, res) => {
   });
 };
 
+const listarCierresGenerales = (req, res) => {
+  CierreService.listarCierresGenerales((err, results) => {
+    if (err) {
+      console.error('Error al listar cierres generales:', err);
+      return res.status(500).send('Error al listar cierres generales');
+    }
+    res.json(results);
+  });
+};
+
 const crearCierreMasivo = async (req, res) => {
   try {
     const { periodo, efectoresIds, idUsuario } = req.body;
@@ -90,5 +100,5 @@ const obtenerDetalleCierre = async (req, res) => {
 };
 
 // Asegúrate de exportarlo junto a los demás
-module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo, obtenerDetalleCierre };
+module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo, obtenerDetalleCierre, listarCierresGenerales };
 
