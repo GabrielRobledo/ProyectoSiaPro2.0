@@ -59,6 +59,7 @@ const listarCierresGenerales = (req, res) => {
 
 const crearCierreMasivo = async (req, res) => {
   try {
+    console.log('Datos recibidos para cierre masivo:', req.body);
     const { periodo, efectoresIds, idUsuario } = req.body;
 
     if (!periodo || !efectoresIds || !Array.isArray(efectoresIds) || efectoresIds.length === 0 || !idUsuario) {
