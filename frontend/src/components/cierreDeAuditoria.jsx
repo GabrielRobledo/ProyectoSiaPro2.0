@@ -98,18 +98,18 @@ const CierreDeAuditoria = ({ idUsuario }) => {
   }, [periodoSeleccionado, auditorias, efectores]);
 
   const generarCierreGeneral = async () => {
-    // Respaldo por si la prop viene vacía o nula
+    // Obtenemos el usuario directamente del localStorage de forma segura
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const idUsuarioFinal = idUsuario || storedUser?.idUsuario || storedUser?.id;
+    const usuarioIdReal = idUsuario || storedUser?.idUsuario || storedUser?.id;
 
-    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !idUsuarioFinal) {
-      Swal.fire('❌ Error', 'No se pudo identificar el usuario actual.', 'error');
+    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !usuarioIdReal) {
+      Swal.fire('❌ Error', 'Faltan datos o no se pudo identificar al usuario actual.', 'error');
       return;
     }
 
     const confirmacion = await Swal.fire({
       title: '¿Confirmar Cierre General?',
-      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores en el periodo ${periodoSeleccionado}.`,
+      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores auditados en el periodo ${periodoSeleccionado}.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, generar cierre general',
@@ -122,14 +122,15 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       await axios.post(`${API_URL}/api/cierres-masivos`, {
         periodo: periodoSeleccionado,
         efectoresIds: efectoresAuditadosPendientes.map(e => e.idEfector),
-        idUsuario: Number(usuarioIdFinal), // Se envía seguro y convertido a número
+        idUsuario: Number(usuarioIdReal),
       });
 
       Swal.fire('✅ Cierre General Exitoso', 'Los cierres del periodo se generaron correctamente.', 'success');
       setPeriodoSeleccionado('');
       cargarCierres();
     } catch (error) {
-      Swal.fire('❌ Error', 'Hubo un problema al procesar el cierre masivo.', 'error');
+      console.error(error);
+      Swal.fire('❌ Error', error.response?.data?.error || 'Hubo un problema al procesar el cierre masivo.', 'error');
     }
   };
 
