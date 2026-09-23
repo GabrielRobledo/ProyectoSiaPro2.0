@@ -53,16 +53,14 @@ const Cierre = {
   },
   // Dentro de tu archivo de modelo/servicio (ej: cierreModel.js o cierreServices.js)
 
-crearCierreMasivo(periodo, efectoresIds, idUsuario) {
+  crearCierreMasivo(periodo, efectoresIds, idUsuario) {
     return new Promise((resolve, reject) => {
-      // Iniciamos una transacción con la conexión estándar
       db.beginTransaction(async (err) => {
         if (err) return reject(err);
 
         try {
           const cierresCreados = [];
 
-          // Función auxiliar para manejar queries con promesas usando el db global
           const queryTrans = (sql, params) => new Promise((res, rej) => {
             db.query(sql, params, (error, results) => {
               if (error) return rej(error);
@@ -72,27 +70,37 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
 
           for (const idEfector of efectoresIds) {
             
-            // 1. Calcular los indicadores macro exigidos para la tesis
-            const resumenRows = await queryTrans(`
+            // 1. Obtener totales de atenciones y facturación general sin cruzar con detalles para evitar duplicidad
+            const atencionesRows = await queryTrans(`
               SELECT 
                 COUNT(DISTINCT a.idAtencion) AS cantidadAtenciones,
-                SUM(IFNULL(a.valorTotal, 0)) AS totalFacturadoGeneral,
-                SUM(IFNULL(da.importe, 0)) AS totalDebitadoGeneral,
-                SUM(CASE WHEN da.importe > 0 THEN 1 ELSE 0 END) AS cantidadDebitos
+                SUM(IFNULL(a.valorTotal, 0)) AS totalFacturadoGeneral
               FROM atenciones a
               JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
-              LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
               WHERE a.idEfector = ?
             `, [periodo, idEfector]);
 
-            const resumen = resumenRows[0] || {};
-            const cantidadAtenciones = resumen.cantidadAtenciones || 0;
-            const totalFacturadoGeneral = resumen.totalFacturadoGeneral || 0;
-            const totalDebitadoGeneral = resumen.totalDebitadoGeneral || 0;
-            const totalNeto = totalFacturadoGeneral - totalDebitadoGeneral;
-            const cantidadDebitos = resumen.cantidadDebitos || 0;
+            const resumenAtenciones = atencionesRows[0] || {};
+            const cantidadAtenciones = resumenAtenciones.cantidadAtenciones || 0;
+            const totalFacturadoGeneral = resumenAtenciones.totalFacturadoGeneral || 0;
 
-            // 2. Insertar cabecera con totales
+            // 2. Obtener totales de débitos de forma independiente
+            const debitosRows = await queryTrans(`
+              SELECT 
+                COUNT(DISTINCT da.idAtencion) AS cantidadDebitos,
+                SUM(IFNULL(da.importe, 0)) AS totalDebitadoGeneral
+              FROM \`detalle-auditoria\` da
+              JOIN atenciones a ON da.idAtencion = a.idAtencion
+              JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
+              WHERE a.idEfector = ? AND da.importe > 0
+            `, [periodo, idEfector]);
+
+            const resumenDebitos = debitosRows[0] || {};
+            const totalDebitadoGeneral = resumenDebitos.totalDebitadoGeneral || 0;
+            const cantidadDebitos = resumenDebitos.cantidadDebitos || 0;
+            const totalNeto = totalFacturadoGeneral - totalDebitadoGeneral;
+
+            // 3. Insertar la cabecera del cierre
             const resultCierre = await queryTrans(`
               INSERT INTO cierres 
               (idUsuario, idEfector, periodo, totalFacturadoGeneral, totalDebitadoGeneral, totalNeto, cantidadAtenciones, cantidadDebitos, fechaCierre) 
@@ -101,15 +109,15 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
 
             const idCierre = resultCierre.insertId;
 
-            // 3. Insertar detalles (manejando nulos para la columna motivos)
+            // 4. Insertar los detalles agrupados por atención (usando GROUP_CONCAT para agrupar motivos si hay varios)
             await queryTrans(`
               INSERT INTO cierres_detalle (idCierre, idAtencion, tieneDebito, totalDebito, motivos)
               SELECT 
                 ? AS idCierre,
                 a.idAtencion,
-                CASE WHEN MAX(da.importe) > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
-                IFNULL(MAX(da.importe), 0) AS totalDebito,
-                IFNULL(MAX(IF(da.importe > 0, m.motivo, NULL)), '') AS motivos
+                CASE WHEN SUM(IFNULL(da.importe, 0)) > 0 THEN TRUE ELSE FALSE END AS tieneDebito,
+                SUM(IFNULL(da.importe, 0)) AS totalDebito,
+                IFNULL(GROUP_CONCAT(DISTINCT m.motivo SEPARATOR ', '), '') AS motivos
               FROM atenciones a
               JOIN auditoria au ON a.idEfector = au.idEfector AND au.periodo = ?
               LEFT JOIN \`detalle-auditoria\` da ON a.idAtencion = da.idAtencion
@@ -121,17 +129,15 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
             cierresCreados.push({ idCierre, idEfector, totalNeto });
           }
 
-          // Si todo salió bien, hacemos commit de la transacción global
           db.commit((errCommit) => {
             if (errCommit) {
-              return db.rollback(() => {
-                reject(errCommit);
-              });
+              return db.rollback(() => reject(errCommit));
             }
             resolve(cierresCreados);
           });
 
         } catch (error) {
+          console.error('❌ Error crítico en transacción de cierre masivo:', error);
           db.rollback(() => {
             reject(error);
           });
