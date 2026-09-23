@@ -208,17 +208,17 @@ crearCierreMasivo(periodo, efectoresIds, idUsuario) {
     });
   },
 
-  obtenerDetalleCierrePorId(idCierre, callback) {
+obtenerDetalleCierrePorId(idCierre, callback) {
     const sql = `
       SELECT 
-          \`e\`.\`RazonSocial\` AS \`hospital\`,
-          \`ac\`.\`monto_facturado\` AS \`total_facturado\`,
-          \`ac\`.\`monto_debitado\` AS \`total_debitado\`,
-          \`ac\`.\`monto_neto\` AS \`total_neto\`,
-          \`ac\`.\`tiene_debito\` AS \`cantidad_debitos\`
-      FROM \`atenciones_cierre\` AS \`ac\`
-      JOIN \`efectores\` AS \`e\` ON \`ac\`.\`idEfector\` = \`e\`.\`idEfector\`
-      WHERE \`ac\`.\`idCierre\` = ?
+          e.RazonSocial AS hospital,
+          ac.monto_facturado AS total_facturado,
+          ac.monto_debitado AS total_debitado,
+          ac.monto_neto AS total_neto,
+          ac.tiene_debito AS cantidad_debitos
+      FROM atenciones_cierre AS ac
+      JOIN efectores AS e ON ac.idEfector = e.idEfector
+      WHERE ac.idCierre = ?
     `;
     db.query(sql, [idCierre], callback);
   }
