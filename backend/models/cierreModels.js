@@ -38,22 +38,25 @@ const Cierre = {
   },
 
   listarCierresGenerales(callback) {
-      const sql = `
-        SELECT 
-          cg.id AS idCierreGeneral, 
-          cg.periodo, 
-          cg.fecha_cierre, 
-          cg.total_atenciones, 
-          u.nombre AS usuario
-        FROM cierres_generales cg
-        JOIN usuarios u ON cg.idUsuario = u.idUsuario
-        ORDER BY cg.periodo DESC, cg.fecha_cierre DESC;
-      `;
-      db.query(sql, (err, results) => {
-        if (err) return callback(err);
-        callback(null, results);
-      });
-    },
+    const sql = `
+      SELECT 
+        cg.id AS idCierreGeneral, 
+        cg.periodo, 
+        cg.fecha_cierre, 
+        cg.total_atenciones, 
+        IFNULL(u.nombre, 'Sistema') AS usuario
+      FROM cierres_generales cg
+      LEFT JOIN usuarios u ON cg.idUsuario = u.idUsuario
+      ORDER BY cg.periodo DESC, cg.fecha_cierre DESC;
+    `;
+    db.query(sql, (err, results) => {
+      if (err) {
+        console.error('Error detallado en listarCierresGenerales:', err);
+        return callback(err);
+      }
+      callback(null, results);
+    });
+  },
 
   crearCierreMasivo(periodo, efectoresIds, idUsuario) {
       return new Promise((resolve, reject) => {
