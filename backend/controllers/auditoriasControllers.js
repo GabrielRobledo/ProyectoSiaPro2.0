@@ -4,49 +4,70 @@ const borradoresModel = require('../models/auditoriasProgresoModels');
 const resumenModel = require('../models/auditoriaModels');
 
 exports.crearAuditoria = (req, res) => {
-  const { periodo, idUsuario, idEfector, totalDebito, detalles } = req.body;
+  const { periodo, idEfector, totalDebito, detalles } = req.body;
 
-  if (!periodo || !idUsuario || !idEfector || !detalles || detalles.length === 0) {
+  if (!periodo || !idEfector || !detalles || detalles.length === 0) {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
   }
 
-  db.beginTransaction((err) => {
-    if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
+  // 🔍 PASO CLAVE: Consultamos quién es el usuario actual en la tabla de progreso 
+  // (esto garantiza que si fue reasignado, obtengamos el ID del auditor nuevo).
+  db.query(
+    'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
+    [idEfector, periodo],
+    (errProg, progRows) => {
+      if (errProg) {
+        console.error(errProg);
+        return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
+      }
 
-    db.query(
-      'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
-      [periodo, idUsuario, idEfector, totalDebito],
-      (err, result) => {
-        if (err) return db.rollback(() => {
-          console.error(err);
-          res.status(500).json({ mensaje: 'Error al guardar auditoría' });
-        });
+      // Si existe un registro en progreso, usamos ese idUsuario (el nuevo). 
+      // Si por alguna razón no está, recurrimos al que viene por req.body.
+      const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
 
-        const idAuditoria = result.insertId;
-        const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
+      if (!idUsuarioFinal) {
+        return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
+      }
+
+      db.beginTransaction((err) => {
+        if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
 
         db.query(
-          'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
-          [inserts],
-          (err) => {
+          'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
+          [periodo, idUsuarioFinal, idEfector, totalDebito],
+          (err, result) => {
             if (err) return db.rollback(() => {
               console.error(err);
-              res.status(500).json({ mensaje: 'Error al guardar detalles' });
+              res.status(500).json({ mensaje: 'Error al guardar auditoría' });
             });
 
-            db.commit((err) => {
-              if (err) return db.rollback(() => {
-                console.error(err);
-                res.status(500).json({ mensaje: 'Error al confirmar transacción' });
-              });
+            const idAuditoria = result.insertId;
+            const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
 
-              res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria });
-            });
+            db.query(
+              'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
+              [inserts],
+              (err) => {
+                if (err) return db.rollback(() => {
+                  console.error(err);
+                  res.status(500).json({ mensaje: 'Error al guardar detalles' });
+                });
+
+                db.commit((err) => {
+                  if (err) return db.rollback(() => {
+                    console.error(err);
+                    res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                  });
+
+                  res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria });
+                });
+              }
+            );
           }
         );
-      }
-    );
-  });
+      });
+    }
+  );
 };
 
 exports.listarAuditorias = (req, res) => {
