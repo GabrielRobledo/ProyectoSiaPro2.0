@@ -36,6 +36,20 @@ const Cierre = {
       callback(null, result);
     });
   },
+  // 1. ESTA ES LA QUE DA ERROR SI FALTA (La que usa el servicio viejo)
+  listarCierres(callback) {
+    const sql = `
+      SELECT c.idCierre, c.periodo, c.idEfector, e.RazonSocial, u.nombre AS usuario
+      FROM cierres c
+      JOIN efectores e ON c.idEfector = e.idEfector
+      JOIN usuarios u ON c.idUsuario = u.idUsuario
+      ORDER BY c.periodo DESC, e.RazonSocial;
+    `;
+    db.query(sql, (err, results) => {
+      if (err) return callback(err);
+      callback(null, results);
+    });
+  },
 
   listarCierresGenerales(callback) {
     const sql = `
