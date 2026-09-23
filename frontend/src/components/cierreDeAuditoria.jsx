@@ -99,9 +99,10 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
   const generarCierreGeneral = async () => {
     // Respaldo por si la prop viene vacía o nula
-    const usuarioIdFinal = idUsuario || localStorage.getItem('idUsuario') || JSON.parse(localStorage.getItem('usuario'))?.idUsuario;
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const idUsuarioFinal = idUsuario || storedUser?.idUsuario || storedUser?.id;
 
-    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !usuarioIdFinal) {
+    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !idUsuarioFinal) {
       Swal.fire('❌ Error', 'No se pudo identificar el usuario actual.', 'error');
       return;
     }
