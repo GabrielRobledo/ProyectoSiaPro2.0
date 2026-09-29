@@ -571,7 +571,6 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
     const totalDebitoFinal = registrosProcesados.reduce((acc, r) => acc + parseFloat(r.debito), 0);
 
     const payload = {
-      periodo,
       idUsuario,
       idEfector,
       totalDebito: totalDebitoFinal,
