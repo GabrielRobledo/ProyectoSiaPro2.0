@@ -23,11 +23,10 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
   const [columnVisibility, setColumnVisibility] = useState({});
   const [checkedRows, setCheckedRows] = useState({});
   const [motivos, setMotivos] = useState([]);
-  // ...sin efectoresAsignados...
   const pageSize = 30;
   const navigate = useNavigate();
   const [hayCambios, setHayCambios] = useState(false);
-  // ...sin useEffect de efectoresAsignados...
+
 
   
   useEffect(() => {
@@ -781,20 +780,21 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
           <thead>
             {tipo === 'atenciones' && (
               <tr>
-              {table.getVisibleLeafColumns().map((col) => (
-                <th key={col.id} style={{ ...thStyle, backgroundColor: '#b3e5fc' }}>
-                  {col.id === 'debito' && (
-                    <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      Total: {formatearMoneda(totalDebito)}
-                    </span>
-                  )}
-                  {col.id === 'revisado' && (
-                    <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      {totalRevisados} / {filteredRows.length}
-                    </span>
-                  )}
-                </th>
-              ))}
+                {table.getVisibleLeafColumns().map((col) => (
+                  <th key={col.id} style={{ ...thStyle, backgroundColor: '#b3e5fc' }}>
+                    
+                    {col.columnDef.header === 'Débito $' ? (
+                      <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                        Total: {formatearMoneda(totalDebito)}
+                      </span>
+                    ) : null}
+                    {col.columnDef.header === "Revisado" ? (
+                      <span style={{ color: '#00796b', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                        {totalRevisados} / {filteredRows.length}
+                      </span>
+                    ) : null}
+                  </th>
+                ))}
               </tr>
             )}
             {table.getHeaderGroups().map((headerGroup) => (
