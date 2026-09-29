@@ -39,6 +39,7 @@ const Dashboard = () => {
   const [resumenData, setResumenData] = useState(null);
   const [openFactModal, setOpenFactModal] = useState(false);
   const [facturacionResumen, setFacturacionResumen] = useState(null);
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('TODOS');
 
   const handleOpenModal = (title, items) => {
     setModalTitle(title);
@@ -69,6 +70,48 @@ const Dashboard = () => {
     setFacturacionResumen(resumen);
     setOpenFactModal(true);
   };
+
+  // Función auxiliar para transformar fechas tipo '10-AUG-24' a '2024-08'
+  const convertirFechaAPeriodo = (fechaStr) => {
+    if (!fechaStr) return null;
+    // Si ya viene en formato YYYY-MM
+    if (/^\d{4}-\d{2}$/.test(fechaStr)) return fechaStr;
+    // Si viene en formato tipo '10-AUG-24'
+    const partes = fechaStr.split('-');
+    if (partes.length === 3) {
+      const [dia, mesTexto, anioDosDigitos] = partes;
+      const meses = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
+        'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+      };
+      const mesNum = meses[mesTexto.toUpperCase()];
+      const anioCompleto = `20${anioDosDigitos}`;
+      if (mesNum) {
+        return `${anioCompleto}-${mesNum}`;
+      }
+    }
+    // Por si acaso viene en formato YYYY-MM-DD
+    return fechaStr.slice(0, 7);
+  };
+
+  // 2. Extraer periodos únicos EXCLUSIVAMENTE de la tabla atenciones
+  const periodosDisponibles = useMemo(() => {
+    const setP = new Set(
+      atenciones.map(a => convertirFechaAPeriodo(a.fecha)).filter(Boolean)
+    );
+    return Array.from(setP).sort().reverse();
+  }, [atenciones]);
+
+  // 3. Filtrar atenciones y auditorías según el periodo seleccionado
+  const atencionesFiltradasPeriodo = useMemo(() => {
+    if (periodoSeleccionado === 'TODOS') return atenciones;
+    return atenciones.filter(a => convertirFechaAPeriodo(a.fecha) === periodoSeleccionado);
+  }, [atenciones, periodoSeleccionado]);
+
+  const auditoriasFiltradas = useMemo(() => {
+    if (periodoSeleccionado === 'TODOS') return auditorias;
+    return auditorias.filter(a => String(a.periodo) === String(periodoSeleccionado));
+  }, [auditorias, periodoSeleccionado]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -109,7 +152,22 @@ const Dashboard = () => {
   const totalHospitalesSinAsignar = totalHospitales - totalHospitalesAsignados;
 
 return (
+  
   <div style={{ padding: '20px' }}>
+    {/* Selector Global de Período basado en Atenciones */}
+    <div style={{ marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '15px 20px', borderRadius: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>
+      <span style={{ fontWeight: 'bold', color: '#555' }}>📅 Período de Atenciones:</span>
+      <select 
+        value={periodoSeleccionado} 
+        onChange={(e) => setPeriodoSeleccionado(e.target.value)}
+        style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', minWidth: '180px' }}
+      >
+        <option value="TODOS">Todos los períodos</option>
+        {periodosDisponibles.map((p, idx) => (
+          <option key={idx} value={p}>{p}</option>
+        ))}
+      </select>
+    </div>
     {/* Bloque: Atenciones */}
     <h2 style={{ marginBottom: '10px', color: '#4e73df' }}>📊 Datos de Atenciones</h2>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '40px' }}>
