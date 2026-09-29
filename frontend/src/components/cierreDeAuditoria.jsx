@@ -72,6 +72,12 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       .catch((err) => console.error('Error al obtener cierres generales:', err));
   };
 
+  // 1. Validar si el período seleccionado ya tiene un cierre general previo
+  const periodoYaCerrado = useMemo(() => {
+    if (!periodoSeleccionado) return false;
+    return cierres.some(c => c.periodo === periodoSeleccionado);
+  }, [periodoSeleccionado, cierres]);
+
   // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
   const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
@@ -210,92 +216,107 @@ const CierreDeAuditoria = ({ idUsuario }) => {
 
             {periodoSeleccionado && (
               <>
-                {/* Resumen Estadístico de la Situación del Periodo */}
-                <Row gutter={16} style={{ marginBottom: 24 }}>
-                  <Col span={12}>
-                    <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
-                      <Statistic 
-                        title="Efectores Listos (Auditados)" 
-                        value={efectoresAuditadosPendientes.length} 
-                        valueStyle={{ color: '#3f8600' }}
-                        prefix={<CheckCircleOutlined />} 
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={12}>
-                    <Card style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}>
-                      <Statistic 
-                        title="Efectores Sin Auditoría (No llegaron)" 
-                        value={efectoresNoAuditados.length} 
-                        valueStyle={{ color: '#faad14' }}
-                        prefix={<WarningOutlined />} 
-                      />
-                    </Card>
-                  </Col>
-                </Row>
+                {/* 🔒 ADVERTENCIA SI EL PERÍODO YA TIENE CIERRE */}
+                {periodoYaCerrado ? (
+                  <div style={{ marginBottom: 24 }}>
+                    <Alert
+                      message="Período ya cerrado"
+                      description={`El período ${periodoSeleccionado} ya cuenta con un cierre general consolidado. No es posible generar un nuevo cierre para este ciclo.`}
+                      type="warning"
+                      showIcon
+                      style={{ borderRadius: '8px', border: '1px solid #ffe58f', backgroundColor: '#fffbe6' }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {/* Resumen Estadístico de la Situación del Periodo */}
+                    <Row gutter={16} style={{ marginBottom: 24 }}>
+                      <Col span={12}>
+                        <Card style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}>
+                          <Statistic 
+                            title="Efectores Listos (Auditados)" 
+                            value={efectoresAuditadosPendientes.length} 
+                            valueStyle={{ color: '#3f8600' }}
+                            prefix={<CheckCircleOutlined />} 
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}>
+                          <Statistic 
+                            title="Efectores Sin Auditoría (No llegaron)" 
+                            value={efectoresNoAuditados.length} 
+                            valueStyle={{ color: '#faad14' }}
+                            prefix={<WarningOutlined />} 
+                          />
+                        </Card>
+                      </Col>
+                    </Row>
 
-                {/* Tabla de Efectores Listos para el Cierre */}
-                <div style={{ marginBottom: 24 }}>
-                  <Title level={4} style={{ color: '#333' }}>Efectores Auditados pendientes de Cierre</Title>
-                  <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        {table.getHeaderGroups().map(headerGroup => (
-                          <tr key={headerGroup.id} style={{ background: '#fafafa' }}>
-                            {headerGroup.headers.map(header => (
-                              <th key={header.id} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                              </th>
+                    {/* Tabla de Efectores Listos para el Cierre */}
+                    <div style={{ marginBottom: 24 }}>
+                      <Title level={4} style={{ color: '#333' }}>Efectores Auditados pendientes de Cierre</Title>
+                      <div style={{ overflowX: 'auto', border: '1px solid #f0f0f0', borderRadius: '8px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            {table.getHeaderGroups().map(headerGroup => (
+                              <tr key={headerGroup.id} style={{ background: '#fafafa' }}>
+                                {headerGroup.headers.map(header => (
+                                  <th key={header.id} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid #f0f0f0' }}>
+                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                  </th>
+                                ))}
+                              </tr>
                             ))}
-                          </tr>
-                        ))}
-                      </thead>
-                      <tbody>
-                        {table.getRowModel().rows.length ? (
-                          table.getRowModel().rows.map(row => (
-                            <tr key={row.id}>
-                              {row.getVisibleCells().map(cell => (
-                                <td key={cell.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </thead>
+                          <tbody>
+                            {table.getRowModel().rows.length ? (
+                              table.getRowModel().rows.map(row => (
+                                <tr key={row.id}>
+                                  {row.getVisibleCells().map(cell => (
+                                    <td key={cell.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+                                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                                  No hay efectores pendientes de cierre para este período.
                                 </td>
-                              ))}
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={columns.length} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-                              No hay efectores pendientes de cierre para este período.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
 
-                {/* Listado resumido de los que NO llegaron */}
-                {efectoresNoAuditados.length > 0 && (
-                  <div style={{ marginBottom: 24, padding: '16px', background: '#fff9f6', borderRadius: '8px', border: '1px solid #ffd8c2' }}>
-                    <Text strong style={{ color: '#d4380d' }}>Atención: Los siguientes efectores no registran auditorías finalizadas en este periodo y quedarán excluidos del cierre general:</Text>
-                    <ul style={{ margin: '8px 0 0 20px', color: '#595959' }}>
-                      {efectoresNoAuditados.map(ef => (
-                        <li key={ef.idEfector}>{ef.RazonSocial} (Cod: {ef.codPrestador})</li>
-                      ))}
-                    </ul>
-                  </div>
+                    {/* Listado resumido de los que NO llegaron */}
+                    {efectoresNoAuditados.length > 0 && (
+                      <div style={{ marginBottom: 24, padding: '16px', background: '#fff9f6', borderRadius: '8px', border: '1px solid #ffd8c2' }}>
+                        <Text strong style={{ color: '#d4380d' }}>Atención: Los siguientes efectores no registran auditorías finalizadas en este periodo y quedarán excluidos del cierre general:</Text>
+                        <ul style={{ margin: '8px 0 0 20px', color: '#595959' }}>
+                          {efectoresNoAuditados.map(ef => (
+                            <li key={ef.idEfector}>{ef.RazonSocial} (Cod: {ef.codPrestador})</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Botón de Ejecución del Cierre General */}
+                    <Button
+                      type="primary"
+                      size="large"
+                      block
+                      disabled={efectoresAuditadosPendientes.length === 0}
+                      onClick={generarCierreGeneral}
+                      style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
+                    >
+                      🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
+                    </Button>
+                  </>
                 )}
-
-                {/* Botón de Ejecución del Cierre General */}
-                <Button
-                  type="primary"
-                  size="large"
-                  block
-                  disabled={efectoresAuditadosPendientes.length === 0}
-                  onClick={generarCierreGeneral}
-                  style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
-                >
-                  🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
-                </Button>
               </>
             )}
 
