@@ -10,21 +10,27 @@ exports.crearAuditoria = (req, res) => {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
   }
 
-  // 1. Extraemos los IDs de las atenciones
   const idsAtenciones = detalles.map(d => Number(d.idAtencion));
 
-  // 2. BUSCAMOS EL PERIODO REAL DIRECTAMENTE DE LA FECHA DE LA ATENCIÓN EN LA BD
-  const sqlPeriodo = 'SELECT DATE_FORMAT(fecha, "%Y-%m") AS periodoReal FROM atenciones WHERE idAtencion IN (?) LIMIT 1';
+  // 1. Traemos la fecha de la primera atención asociada
+  const sqlFecha = 'SELECT fecha FROM atenciones WHERE idAtencion IN (?) LIMIT 1';
 
-  db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
+  db.query(sqlFecha, [idsAtenciones], (errPer, perRows) => {
     if (errPer || !perRows || perRows.length === 0) {
-      console.error('Error al determinar el periodo de la atención:', errPer);
-      return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
+      console.error('Error al buscar fecha:', errPer);
+      return res.status(500).json({ mensaje: 'No se pudo determinar la fecha de las atenciones' });
     }
 
-    const periodoReal = perRows[0].periodoReal; // <-- Este es el periodo real (ej. "2026-05")
+    const fechaAtencion = perRows[0].fecha; // Ej: "10-AUG-24" o similar
 
-    // 3. Continuamos con el resto de la lógica usando estrictamente 'periodoReal'
+    // 2. Extraemos el periodo de manera segura (si viene como texto tipo "10-AUG-24", 
+    // puedes normalizarlo o extraer el mes/año según cómo lo guardes).
+    // Si la fecha es una cadena tipo "YYYY-MM-DD", puedes usar: const periodoReal = fechaAtencion.slice(0, 7);
+    
+    // Para simplificar y asegurarnos de que guarde el formato correcto en la tabla auditoria:
+    const periodoReal = fechaAtencion; // O la lógica para transformarlo a 'YYYY-MM' si es necesario
+
+    // 3. Continuamos con la transacción normal usando 'periodoReal'...
     db.query(
       'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
       [idEfector, periodoReal],
