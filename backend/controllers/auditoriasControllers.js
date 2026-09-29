@@ -219,42 +219,67 @@ exports.obtenerAuditoria = async (req, res) => {
 
 exports.editarAuditoria = (req, res) => {
   const { id } = req.params;
-  const { periodo, totalDebito, detalles } = req.body;
+  const { totalDebito, detalles } = req.body; // Ya no dependemos del periodo del body
 
-  db.beginTransaction(err => {
-    if (err) return res.status(500).json({ error: 'Error al iniciar transacción' });
+  if (!detalles || detalles.length === 0) {
+    return res.status(400).json({ error: 'Faltan detalles para actualizar' });
+  }
 
-    db.query(
-      'UPDATE auditoria SET periodo = ?, totalDebito = ? WHERE idAuditoria = ?',
-      [periodo, totalDebito, id],
-      err => {
-        if (err) return db.rollback(() => res.status(500).json({ error: 'Error al actualizar auditoría' }));
+  const idsAtenciones = detalles.map(d => Number(d.idAtencion));
 
-        db.query('DELETE FROM `detalle-auditoria` WHERE idAuditoria = ?', [id], err => {
-          if (err) return db.rollback(() => res.status(500).json({ error: 'Error al eliminar detalles anteriores' }));
+  // 1. Calculamos el periodo real desde las atenciones
+  const sqlPeriodo = `
+    SELECT DATE_FORMAT(STR_TO_DATE(fecha, '%d-%b-%y'), '%Y-%m') AS periodoReal 
+    FROM atenciones 
+    WHERE idAtencion IN (?) 
+    LIMIT 1
+  `;
 
-          const valores = detalles.map(d => [
-            id,
-            d.idAtencion,
-            d.idMotivo || null, 
-            d.debito,
-          ]);
+  db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
+    if (errPer || !perRows || perRows.length === 0) {
+      console.error('Error al determinar periodo en edición:', errPer);
+      return res.status(500).json({ error: 'Error al determinar el periodo de las atenciones' });
+    }
 
-          db.query(
-            'INSERT INTO `detalle-auditoria` (idAuditoria, idAtencion, idMotivo, importe) VALUES ?',
-            [valores],
-            err => {
-              if (err) return db.rollback(() => res.status(500).json({ error: 'Error al insertar nuevos detalles' }));
+    const periodoReal = perRows[0].periodoReal;
 
-              db.commit(err => {
-                if (err) return db.rollback(() => res.status(500).json({ error: 'Error al confirmar edición' }));
-                res.json({ mensaje: 'Auditoría editada correctamente' });
-              });
-            }
-          );
-        });
-      }
-    );
+    db.beginTransaction(err => {
+      if (err) return res.status(500).json({ error: 'Error al iniciar transacción' });
+
+      // 2. Actualizamos la cabecera con el periodo real recalculado
+      db.query(
+        'UPDATE auditoria SET periodo = ?, totalDebito = ? WHERE idAuditoria = ?',
+        [periodoReal, totalDebito, id],
+        err => {
+          if (err) return db.rollback(() => res.status(500).json({ error: 'Error al actualizar auditoría' }));
+
+          // 3. Borramos los detalles viejos para insertar los nuevos modificados
+          db.query('DELETE FROM `detalle-auditoria` WHERE idAuditoria = ?', [id], err => {
+            if (err) return db.rollback(() => res.status(500).json({ error: 'Error al eliminar detalles anteriores' }));
+
+            const valores = detalles.map(d => [
+              Number(d.idAtencion),
+              Number(id),
+              d.idMotivo || null, 
+              parseFloat(d.debito),
+            ]);
+
+            db.query(
+              'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
+              [valores],
+              err => {
+                if (err) return db.rollback(() => res.status(500).json({ error: 'Error al insertar nuevos detalles' }));
+
+                db.commit(err => {
+                  if (err) return db.rollback(() => res.status(500).json({ error: 'Error al confirmar edición' }));
+                  res.json({ mensaje: 'Auditoría editada correctamente', periodo: periodoReal });
+                });
+              }
+            );
+          });
+        }
+      );
+    });
   });
 };
 
