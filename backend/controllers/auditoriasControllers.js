@@ -11,17 +11,21 @@ exports.crearAuditoria = (req, res) => {
   }
 
   const idsAtenciones = detalles.map(d => Number(d.idAtencion));
+  // 1. Traemos y convertimos la fecha al formato YYYY-MM
+  const sqlPeriodo = `
+    SELECT DATE_FORMAT(STR_TO_DATE(fecha, '%d-%b-%y'), '%Y-%m') AS periodoReal 
+    FROM atenciones 
+    WHERE idAtencion IN (?) 
+    LIMIT 1
+  `;
 
-  // 1. Traemos la fecha de la primera atención asociada
-  const sqlFecha = 'SELECT fecha FROM atenciones WHERE idAtencion IN (?) LIMIT 1';
-
-  db.query(sqlFecha, [idsAtenciones], (errPer, perRows) => {
+  db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
     if (errPer || !perRows || perRows.length === 0) {
-      console.error('Error al buscar fecha:', errPer);
-      return res.status(500).json({ mensaje: 'No se pudo determinar la fecha de las atenciones' });
+      console.error('Error al buscar periodo:', errPer);
+      return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
     }
 
-    const fechaAtencion = perRows[0].fecha; // Ej: "10-AUG-24" o similar
+    const periodoReal = perRows[0].periodoReal; // Ej: "2024-08" o similar
 
     // 2. Extraemos el periodo de manera segura (si viene como texto tipo "10-AUG-24", 
     // puedes normalizarlo o extraer el mes/año según cómo lo guardes).
