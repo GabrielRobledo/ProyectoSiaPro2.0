@@ -52,7 +52,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       });
   }, []);
 
-  // 🔁 Si está en modo edición de auditoría o listado por tipo
+// 🔁 Si está en modo edición de auditoría, traemos auditoría por ID
   useEffect(() => {
     if (editarAuditoria) {
       fetch(`${API_URL}/api/auditorias/${id}`)
@@ -82,14 +82,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
           if (!res.ok) throw new Error('Error al obtener datos');
           return res.json();
         })
-        .then(json => {
-          // 🧪 [PRUEBA] Inyectamos un registro ficticio en los datos generales también
-          const jsonConPrueba = Array.isArray(json) ? [
-            ...json,
-            { idAtencion: 9999, apeYnom: 'PACIENTE FICTICIO', periodo: '2026-12', fecha: '15-DEC-26', valorTotal: 50000, idEfector: 999 }
-          ] : json;
-          setDatos(jsonConPrueba);
-        })
+        .then(json => setDatos(json)) // 👈 Aquí ya no inyectamos nada, va directo el json real
         .catch(err => {
           console.error('Error al cargar datos:', err);
           setDatos([]);
