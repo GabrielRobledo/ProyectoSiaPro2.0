@@ -15,6 +15,9 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   const { user } = useUser();
   const [pendientes, setPendientes] = useState([]);
 
+  // 📅 Nuevo estado para el período seleccionado
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('TODOS');
+
   // 🔄 Traer hospitales pendientes de auditar asignados al auditor
   useEffect(() => {
     if (user?.idUsuario) {
@@ -30,7 +33,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
 
   // 🔄 Traer listado de hospitales (efectores)
   useEffect(() => {
-    fetch( `${API_URL}/api/efectores`)
+    fetch(`${API_URL}/api/efectores`)
       .then(res => {
         if (!res.ok) throw new Error('Error al obtener hospitales');
         return res.json();
@@ -83,17 +86,52 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     }
   }, [tipo, editarAuditoria, id]);
 
-  // 🔍 Filtro por hospital
+  // Función auxiliar para transformar fechas (ej: '15-AUG-24' o 'YYYY-MM') a 'YYYY-MM'
+  const convertirFechaAPeriodo = (fechaStr) => {
+    if (!fechaStr) return null;
+    if (/^\d{4}-\d{2}$/.test(fechaStr)) return fechaStr;
+    const partes = fechaStr.split('-');
+    if (partes.length === 3) {
+      const [dia, mesTexto, anioDosDigitos] = partes;
+      const meses = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
+        'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+      };
+      const mesNum = meses[mesTexto.toUpperCase()];
+      const anioCompleto = `20${anioDosDigitos}`;
+      if (mesNum) return `${anioCompleto}-${mesNum}`;
+    }
+    return fechaStr.slice(0, 7);
+  };
+
+  // 📅 Extraer períodos únicos de los datos cargados
+  const periodosDisponibles = useMemo(() => {
+    const setP = new Set(
+      datos.map(d => d.periodo || convertirFechaAPeriodo(d.fecha)).filter(Boolean)
+    );
+    return Array.from(setP).sort().reverse();
+  }, [datos]);
+
+  // 🔍 Filtro combinado por hospital y por período
   const datosFiltrados = useMemo(() => {
+    let resultado = datos;
+
     if (hospitalFiltro) {
-      return datos.filter(d =>
+      resultado = resultado.filter(d =>
         d.idEfector &&
         String(d.idEfector).toLowerCase() === String(hospitalFiltro).toLowerCase()
       );
     }
-    return datos;
-  }, [datos, hospitalFiltro]);
 
+    if (periodoSeleccionado !== 'TODOS') {
+      resultado = resultado.filter(d => {
+        const pItem = d.periodo || convertirFechaAPeriodo(d.fecha);
+        return String(pItem) === String(periodoSeleccionado);
+      });
+    }
+
+    return resultado;
+  }, [datos, hospitalFiltro, periodoSeleccionado]);
 
   // 🏥 Mostrar nombre del hospital
   const nombreHospital = useMemo(() => {
@@ -107,7 +145,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   // 🖥️ Si es vista general de atenciones sin filtro
   if (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) {
     return (
-      <div>
+      <div style={{ padding: '20px' }}>
         <h2>Hospitales pendientes de auditar</h2>
         {/* 🛠️ CORRECCIÓN: Usamos estrictamente 'pendientes'. Si el array está vacío, se mostrará vacío y no recurrirá a datos generales */}
         {pendientes.length === 0 && <p>No hay hospitales pendientes de auditar.</p>}
@@ -118,8 +156,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
 
   // 📋 Vista principal de registros (listado o edición)
   return (
-    <div>
-      
+    <div style={{ padding: '20px' }}>
       <h2>
         {editarAuditoria
           ? 'Editar Auditoría'
@@ -130,6 +167,20 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
         {hospitalFiltro && nombreHospital && ` - Hospital: ${nombreHospital}`}
       </h2>
 
+      {/* 📅 Selector de Filtro por Período */}
+      <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
+        <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
+        <select 
+          value={periodoSeleccionado} 
+          onChange={(e) => setPeriodoSeleccionado(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
+        >
+          <option value="TODOS">Todos los períodos</option>
+          {periodosDisponibles.map((p, idx) => (
+            <option key={idx} value={p}>{p}</option>
+          ))}
+        </select>
+      </div>
 
       <TablaConFiltro
         datos={datosFiltrados}
