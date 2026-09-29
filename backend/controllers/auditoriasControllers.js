@@ -12,25 +12,28 @@ exports.crearAuditoria = (req, res) => {
 
   const idsAtenciones = detalles.map(d => Number(d.idAtencion));
 
-  // 1. Traemos la fecha de la primera atención asociada
-  const sqlFecha = `SELECT DATE_FORMAT(STR_TO_DATE(fecha, '%d-%b-%y'), '%Y-%m') AS periodoReal FROM atenciones WHERE idAtencion IN (?) LIMIT 1`;
+  // 1. Consultamos y formateamos la fecha directamente a 'YYYY-MM'
+  const sqlPeriodo = `
+    SELECT DATE_FORMAT(STR_TO_DATE(fecha, '%d-%b-%y'), '%Y-%m') AS periodoReal 
+    FROM atenciones 
+    WHERE idAtencion IN (?) 
+    LIMIT 1
+  `;
 
-  db.query(sqlFecha, [idsAtenciones], (errPer, perRows) => {
+  db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
     if (errPer || !perRows || perRows.length === 0) {
-      console.error('Error al buscar fecha:', errPer);
-      return res.status(500).json({ mensaje: 'No se pudo determinar la fecha de las atenciones' });
+      console.error('Error al buscar periodo:', errPer);
+      return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
     }
 
-    const fechaAtencion = perRows[0].fecha; // Ej: "10-AUG-24" o similar
+    // 2. Extraemos correctamente el alias 'periodoReal' que viene de la consulta
+    const periodoReal = perRows[0].periodoReal;
 
-    // 2. Extraemos el periodo de manera segura (si viene como texto tipo "10-AUG-24", 
-    // puedes normalizarlo o extraer el mes/año según cómo lo guardes).
-    // Si la fecha es una cadena tipo "YYYY-MM-DD", puedes usar: const periodoReal = fechaAtencion.slice(0, 7);
-    
-    // Para simplificar y asegurarnos de que guarde el formato correcto en la tabla auditoria:
-    const periodoReal = fechaAtencion; // O la lógica para transformarlo a 'YYYY-MM' si es necesario
+    if (!periodoReal) {
+      return res.status(400).json({ mensaje: 'El formato de la fecha de la atención no es válido para calcular el periodo' });
+    }
 
-    // 3. Continuamos con la transacción normal usando 'periodoReal'...
+    // 3. Continuamos con la verificación en progreso y la transacción normal usando 'periodoReal'
     db.query(
       'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
       [idEfector, periodoReal],
@@ -49,7 +52,7 @@ exports.crearAuditoria = (req, res) => {
         db.beginTransaction((err) => {
           if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
 
-          // 3. Insertamos la auditoría con el periodo real calculado
+          // 4. Insertamos la auditoría con el periodo real calculado ('YYYY-MM')
           db.query(
             'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
             [periodoReal, idUsuarioFinal, idEfector, totalDebito],
