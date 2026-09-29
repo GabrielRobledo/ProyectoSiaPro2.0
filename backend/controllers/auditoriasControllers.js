@@ -10,25 +10,21 @@ exports.crearAuditoria = (req, res) => {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
   }
 
-  // Extraemos los IDs de las atenciones de manera segura
+  // 1. Extraemos los IDs de las atenciones
   const idsAtenciones = detalles.map(d => Number(d.idAtencion));
 
-  // 1. Consultamos el periodo real usando los IDs de las atenciones
+  // 2. BUSCAMOS EL PERIODO REAL DIRECTAMENTE DE LA FECHA DE LA ATENCIÓN EN LA BD
   const sqlPeriodo = 'SELECT DATE_FORMAT(fecha, "%Y-%m") AS periodoReal FROM atenciones WHERE idAtencion IN (?) LIMIT 1';
 
   db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
-    if (errPer) {
-      console.error('Error al buscar periodo:', errPer);
-      return res.status(500).json({ mensaje: 'Error al determinar el periodo de las atenciones' });
+    if (errPer || !perRows || perRows.length === 0) {
+      console.error('Error al determinar el periodo de la atención:', errPer);
+      return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
     }
 
-    if (!perRows || perRows.length === 0) {
-      return res.status(400).json({ mensaje: 'No se encontraron las atenciones asociadas para calcular el periodo' });
-    }
+    const periodoReal = perRows[0].periodoReal; // <-- Este es el periodo real (ej. "2026-05")
 
-    const periodoReal = perRows[0].periodoReal;
-
-    // 2. Verificamos el usuario en la tabla de progreso
+    // 3. Continuamos con el resto de la lógica usando estrictamente 'periodoReal'
     db.query(
       'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
       [idEfector, periodoReal],
