@@ -1,4 +1,4 @@
-  import { useEffect, useState } from 'react';
+  import { useEffect, useState, useMemo } from 'react';
   import { useNavigate } from 'react-router-dom';
   import { useUser } from './contextUsers';
   import Swal from 'sweetalert2';
@@ -110,12 +110,6 @@
     if (periodoSeleccionado === 'TODOS') return atenciones;
     return atenciones.filter(a => convertirFechaAPeriodo(a.fecha) === periodoSeleccionado);
   }, [atenciones, periodoSeleccionado]);
-
-  const auditoriasFiltradas = useMemo(() => {
-    if (periodoSeleccionado === 'TODOS') return auditorias;
-    return auditorias.filter(a => String(a.periodo) === String(periodoSeleccionado));
-  }, [auditorias, periodoSeleccionado]);
-
 
     const auditoriaCerrada = (idEfector, periodo) => {
       return cierres.some(
