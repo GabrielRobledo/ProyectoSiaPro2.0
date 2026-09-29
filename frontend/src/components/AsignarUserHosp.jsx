@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import {
@@ -20,89 +20,144 @@ import {
   ListItemText,
 } from '@mui/material';
 import { Delete as DeleteIcon, Add, Remove, TransferWithinAStation as TransferIcon } from '@mui/icons-material';
-import API_URL from '../config'
+import API_URL from '../config';
 
 const AsignarHospitales = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [efectores, setEfectores] = useState([]);
+  const [atenciones, setAtenciones] = useState([]); // 📅 Para extraer periodos y filtrar efectores
   const [asignacionesTotales, setAsignacionesTotales] = useState([]);
   const [auditorId, setAuditorId] = useState(null);
   const [asignados, setAsignados] = useState([]);
   const [disponibles, setDisponibles] = useState([]);
   const [tabIndex, setTabIndex] = useState(0);
   const [usuariosLibres, setUsuariosLibres] = useState([]);
+  
+  // 📅 Estado para el período del filtro
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
 
-const fetchData = async () => {
-  try {
-    const [usuariosRes, efectoresRes, asignacionesRes] = await Promise.all([
-      axios.get(`${API_URL}/api/auth/usuarios`),
-      axios.get(`${API_URL}/api/efectores`),
-      axios.get(`${API_URL}/api/asignaciones`)
-    ]);
+  const fetchData = async () => {
+    try {
+      const [usuariosRes, efectoresRes, asignacionesRes, atencionesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/auth/usuarios`),
+        axios.get(`${API_URL}/api/efectores`),
+        axios.get(`${API_URL}/api/asignaciones`),
+        axios.get(`${API_URL}/api/atenciones`)
+      ]);
 
-    const usuariosData = usuariosRes.data;
-    const efectoresData = efectoresRes.data;
-    const asignacionesData = asignacionesRes.data;
+      const usuariosData = usuariosRes.data;
+      const efectoresData = efectoresRes.data;
+      const asignacionesData = asignacionesRes.data;
+      const atencionesData = atencionesRes.data;
 
-    const auditores = usuariosData.filter(u => u.tipoUsuario === 'auditor');
-    const auditoresAsignados = new Set(asignacionesData.map(a => a.idUsuario));
-    const efectoresAsignados = new Set(asignacionesData.map(a => a.idEfector));
+      setAtenciones(atencionesData);
+      setEfectores(efectoresData);
 
-    // 1. Guardamos TODOS los auditores para usarlos en la reasignación
-    setUsuarios(auditores); 
+      const auditores = usuariosData.filter(u => u.tipoUsuario === 'auditor');
+      const auditoresAsignados = new Set(asignacionesData.map(a => a.idUsuario));
 
-    // 2. Filtramos SOLO los libres para la pestaña de asignación inicial
-    setUsuariosLibres(auditores.filter(a => !auditoresAsignados.has(a.idUsuario)));
+      setUsuarios(auditores); 
+      setUsuariosLibres(auditores.filter(a => !auditoresAsignados.has(a.idUsuario)));
 
-    setEfectores(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
-    setDisponibles(efectoresData.filter(e => !efectoresAsignados.has(e.idEfector)));
+      const asignacionesAgrupadas = auditores
+        .map(auditor => {
+          const hospitales = asignacionesData
+            .filter(a => a.idUsuario === auditor.idUsuario)
+            .map(a => {
+              const hosp = efectoresData.find(e => e.idEfector === a.idEfector);
+              return hosp ? hosp.RazonSocial : 'Hospital no encontrado';
+            });
 
-    const asignacionesAgrupadas = auditores
-      .map(auditor => {
-        const hospitales = asignacionesData
-          .filter(a => a.idUsuario === auditor.idUsuario)
-          .map(a => {
-            const hosp = efectoresData.find(e => e.idEfector === a.idEfector);
-            return hosp ? hosp.RazonSocial : 'Hospital no encontrado';
-          });
+          return {
+            idUsuario: auditor.idUsuario,
+            nombre: auditor.nombre,
+            hospitales
+          };
+        })
+        .filter(grupo => grupo.hospitales.length > 0);
 
-        return {
-          idUsuario: auditor.idUsuario,
-          nombre: auditor.nombre,
-          hospitales
-        };
-      })
-      .filter(grupo => grupo.hospitales.length > 0);
-
-    setAsignacionesTotales(asignacionesAgrupadas);
-  } catch (error) {
-    console.error(error);
-    Swal.fire('Error', 'No se pudo cargar la información.', 'error');
-  }
-};
+      setAsignacionesTotales(asignacionesAgrupadas);
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', 'No se pudo cargar la información.', 'error');
+    }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Función auxiliar para normalizar fechas de atenciones a 'YYYY-MM'
+  const convertirFechaAPeriodo = (fechaStr) => {
+    if (!fechaStr) return null;
+    if (/^\d{4}-\d{2}$/.test(fechaStr)) return fechaStr;
+    const partes = fechaStr.split('-');
+    if (partes.length === 3) {
+      const [dia, mesTexto, anioDosDigitos] = partes;
+      const meses = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06',
+        'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+      };
+      const mesNum = meses[mesTexto.toUpperCase()];
+      const anioCompleto = `20${anioDosDigitos}`;
+      if (mesNum) return `${anioCompleto}-${mesNum}`;
+    }
+    return fechaStr.slice(0, 7);
+  };
+
+  // 📅 Extraer períodos únicos desde las atenciones
+  const periodosDisponibles = useMemo(() => {
+    const setP = new Set(
+      atenciones.map(a => a.periodo || convertirFechaAPeriodo(a.fecha)).filter(Boolean)
+    );
+    return Array.from(setP).sort().reverse();
+  }, [atenciones]);
+
+  // Seleccionar por defecto el primer período si está vacío
+  useEffect(() => {
+    if (periodosDisponibles.length > 0 && !periodoSeleccionado) {
+      setPeriodoSeleccionado(periodosDisponibles[0]);
+    }
+  }, [periodosDisponibles, periodoSeleccionado]);
+
+  // 🏥 Filtrar los hospitales disponibles según el período seleccionado y los ya asignados
   useEffect(() => {
     if (!auditorId) {
       setAsignados([]);
-      setDisponibles(efectores);
+      setDisponibles([]);
       return;
     }
 
+    // 1. Obtener los IDs de efectores que tienen atenciones en el período seleccionado
+    const efectoresIdsEnPeriodo = new Set(
+      atenciones
+        .filter(a => {
+          if (!periodoSeleccionado) return true;
+          const pItem = a.periodo || convertirFechaAPeriodo(a.fecha);
+          return String(pItem) === String(periodoSeleccionado);
+        })
+        .map(a => a.idEfector)
+    );
+
+    // 2. Traer las asignaciones actuales del auditor
     axios.get(`${API_URL}/api/asignaciones/${auditorId}`)
       .then(res => {
         const idsAsignados = res.data.map(a => a.idEfector);
+        
+        // Hospitales ya asignados al auditor
         setAsignados(efectores.filter(e => idsAsignados.includes(e.idEfector)));
-        setDisponibles(efectores.filter(e => !idsAsignados.includes(e.idEfector)));
+
+        // Hospitales disponibles: que estén en el período seleccionado Y que no estén ya asignados
+        const filtradosPorPeriodo = efectores.filter(e => 
+          efectoresIdsEnPeriodo.has(e.idEfector) && !idsAsignados.includes(e.idEfector)
+        );
+        setDisponibles(filtradosPorPeriodo);
       })
       .catch(() => {
         setAsignados([]);
-        setDisponibles(efectores);
+        setDisponibles([]);
       });
-  }, [auditorId, efectores]);
+  }, [auditorId, efectores, atenciones, periodoSeleccionado]);
 
   const asignar = (idEfector) => {
     const seleccionado = disponibles.find(e => e.idEfector === idEfector);
@@ -162,8 +217,6 @@ const fetchData = async () => {
       });
   };
 
-
-  // En AsignarUserHosp.jsx
   const eliminarAsignacion = (idUsuario) => {
     Swal.fire({
       title: '¿Estás seguro?',
@@ -183,7 +236,6 @@ const fetchData = async () => {
             setAsignados([]);
           })
           .catch((error) => {
-            // 👈 Aquí capturamos el mensaje exacto que envía el backend
             const mensajeError = error.response?.data?.msg || 'No se pudo eliminar la asignación.';
             Swal.fire('Operación Denegada', mensajeError, 'error');
           });
@@ -191,10 +243,7 @@ const fetchData = async () => {
     });
   };
 
-
   const abrirModalReasignar = async (grupoOrigen) => {
-    // Filtrar otros auditores disponibles (excluyendo al actual)
-    // Nota: podrías necesitar traer la lista completa de auditores activos
     const auditoresDisponibles = usuarios.filter(u => u.idUsuario !== grupoOrigen.idUsuario);
 
     if (auditoresDisponibles.length === 0) {
@@ -202,7 +251,6 @@ const fetchData = async () => {
       return;
     }
 
-    // Creamos un selector dinámico con SweetAlert2
     const inputOptions = {};
     auditoresDisponibles.forEach(aud => {
       inputOptions[aud.idUsuario] = aud.nombre;
@@ -220,7 +268,6 @@ const fetchData = async () => {
 
     if (nuevoAuditorId) {
       try {
-        // Llamada al backend para transferir
         await axios.put(`${API_URL}/api/asignaciones/reasignar`, {
           idUsuarioOrigen: grupoOrigen.idUsuario,
           idUsuarioDestino: Number(nuevoAuditorId)
@@ -234,7 +281,6 @@ const fetchData = async () => {
       }
     }
   };
-  
 
   return (
     <Container maxWidth="md" sx={{ mt: 5, mb: 5 }}>
@@ -256,6 +302,27 @@ const fetchData = async () => {
 
       {tabIndex === 0 && (
         <>
+          {/* 📅 Selector de Período para filtrar los hospitales disponibles */}
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: '15px', bgcolor: '#fff', p: 2, borderRadius: 2, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+            <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#555' }}>
+              📅 Filtrar Hospitales por Período:
+            </Typography>
+            <TextField
+              select
+              SelectProps={{ native: true }}
+              value={periodoSeleccionado}
+              onChange={(e) => setPeriodoSeleccionado(e.target.value)}
+              variant="outlined"
+              size="small"
+              sx={{ minWidth: 200 }}
+            >
+              <option value="" disabled>Seleccione un período</option>
+              {periodosDisponibles.map((p, idx) => (
+                <option key={idx} value={p}>{p}</option>
+              ))}
+            </TextField>
+          </Box>
+
           <Autocomplete
             options={usuariosLibres}
             getOptionLabel={(option) => option.nombre}
@@ -294,17 +361,23 @@ const fetchData = async () => {
                   flexWrap="wrap"
                   sx={{ maxHeight: 480, overflowY: 'auto' }}
                 >
-                  {disponibles.map(h => (
-                    <Tooltip key={h.idEfector} title={h.RazonSocial}>
-                      <Chip
-                        label={h.RazonSocial.length > 20 ? `${h.RazonSocial.slice(0, 20)}...` : h.RazonSocial}
-                        onClick={() => asignar(h.idEfector)}
-                        deleteIcon={<Add />}
-                        onDelete={() => asignar(h.idEfector)}
-                        sx={{ maxWidth: 220, cursor: 'pointer' }}
-                      />
-                    </Tooltip>
-                  ))}
+                  {disponibles.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                      No hay hospitales con atenciones en este período.
+                    </Typography>
+                  ) : (
+                    disponibles.map(h => (
+                      <Tooltip key={h.idEfector} title={h.RazonSocial}>
+                        <Chip
+                          label={h.RazonSocial.length > 20 ? `${h.RazonSocial.slice(0, 20)}...` : h.RazonSocial}
+                          onClick={() => asignar(h.idEfector)}
+                          deleteIcon={<Add />}
+                          onDelete={() => asignar(h.idEfector)}
+                          sx={{ maxWidth: 220, cursor: 'pointer', mb: 1 }}
+                        />
+                      </Tooltip>
+                    ))
+                  )}
                 </Stack>
               </Grid>
 
@@ -336,7 +409,7 @@ const fetchData = async () => {
                         deleteIcon={<Remove />}
                         onDelete={() => quitar(h.idEfector)}
                         color="secondary"
-                        sx={{ maxWidth: 220, cursor: 'pointer' }}
+                        sx={{ maxWidth: 220, cursor: 'pointer', mb: 1 }}
                       />
                     </Tooltip>
                   ))}
@@ -345,7 +418,7 @@ const fetchData = async () => {
             </Grid>
           )}
 
-          <Box display="flex" justifyContent="center" mt={4}>
+          <Box display="flex" justifyContent="center" mt-="mt: 4">
             <Button
               variant="contained"
               color="primary"
@@ -358,30 +431,30 @@ const fetchData = async () => {
         </>
       )}
 
-    {tabIndex === 1 && (
-      <List sx={{ maxHeight: 600, overflowY: 'auto' }}>
-        {asignacionesTotales.map((grupo) => (
-          <ListItemButton key={grupo.idUsuario} sx={{ mb: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-            <ListItemText
-              primary={grupo.nombre}
-              secondary={`Hospitales: ${grupo.hospitales.join(', ')}`}
-            />
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="Reasignar hospitales a otro auditor">
-                <IconButton edge="end" color="primary" onClick={() => abrirModalReasignar(grupo)}>
-                  <TransferIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Eliminar asignaciones">
-                <IconButton edge="end" color="error" onClick={() => eliminarAsignacion(grupo.idUsuario)}>
-                  <DeleteIcon />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </ListItemButton>
-        ))}
-      </List>
-    )}
+      {tabIndex === 1 && (
+        <List sx={{ maxHeight: 600, overflowY: 'auto' }}>
+          {asignacionesTotales.map((grupo) => (
+            <ListItemButton key={grupo.idUsuario} sx={{ mb: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+              <ListItemText
+                primary={grupo.nombre}
+                secondary={`Hospitales: ${grupo.hospitales.join(', ')}`}
+              />
+              <Stack direction="row" spacing={1}>
+                <Tooltip title="Reasignar hospitales a otro auditor">
+                  <IconButton edge="end" color="primary" onClick={() => abrirModalReasignar(grupo)}>
+                    <TransferIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Eliminar asignaciones">
+                  <IconButton edge="end" color="error" onClick={() => eliminarAsignacion(grupo.idUsuario)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            </ListItemButton>
+          ))}
+        </List>
+      )}
     </Container>
   );
 };

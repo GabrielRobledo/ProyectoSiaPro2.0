@@ -23,7 +23,14 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     if (user?.idUsuario) {
       fetch(`${API_URL}/api/asignaciones-sin-auditoria/${user.idUsuario}`)
         .then(res => res.json())
-        .then(data => setPendientes(data))
+        .then(data => {
+          // 🧪 [PRUEBA] Inyectamos un elemento con período ficticio para testear
+          const datosConPrueba = [
+            ...data,
+            { idEfector: 999, RazonSocial: 'HOSPITAL FICTICIO DE PRUEBA', periodo: '2026-12', fecha: '15-DEC-26' }
+          ];
+          setPendientes(datosConPrueba);
+        })
         .catch(err => {
           setPendientes([]);
           console.error('Error al obtener hospitales pendientes:', err);
@@ -75,7 +82,14 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
           if (!res.ok) throw new Error('Error al obtener datos');
           return res.json();
         })
-        .then(json => setDatos(json))
+        .then(json => {
+          // 🧪 [PRUEBA] Inyectamos un registro ficticio en los datos generales también
+          const jsonConPrueba = Array.isArray(json) ? [
+            ...json,
+            { idAtencion: 9999, apeYnom: 'PACIENTE FICTICIO', periodo: '2026-12', fecha: '15-DEC-26', valorTotal: 50000, idEfector: 999 }
+          ] : json;
+          setDatos(jsonConPrueba);
+        })
         .catch(err => {
           console.error('Error al cargar datos:', err);
           setDatos([]);
@@ -101,7 +115,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return fechaStr.slice(0, 7);
   };
 
-  // 📅 Extraer períodos únicos (tanto de pendientes como de datos generales)
+  // 📅 Extraer períodos únicos (incluyendo el ficticio de prueba)
   const periodosDisponibles = useMemo(() => {
     const fuenteDatos = (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) ? pendientes : datos;
     const setP = new Set(
@@ -149,13 +163,13 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return h?.RazonSocial || null;
   }, [hospitalFiltro, hospitales]);
 
-  // 🖥️ Si es vista general de atenciones sin filtro (Muestra las tarjetas de hospitales pendientes)
+  // 🖥️ Si es vista general de atenciones sin filtro
   if (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) {
     return (
       <div style={{ padding: '20px' }}>
         <h2>Hospitales pendientes de auditar</h2>
 
-        {/* 📅 Selector de Período para las Tarjetas Pendientes */}
+        {/* 📅 Selector de Período */}
         <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
           <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
           <select 
@@ -176,7 +190,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     );
   }
 
-  // 📋 Vista principal de registros cuando ya se seleccionó un hospital o tipo específico
+  // 📋 Vista principal de registros
   return (
     <div style={{ padding: '20px' }}>
       <h2>
@@ -189,7 +203,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
         {hospitalFiltro && nombreHospital && ` - Hospital: ${nombreHospital}`}
       </h2>
 
-      {/* 📅 Selector de Período para la Tabla */}
+      {/* 📅 Selector de Período */}
       <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
         <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
         <select 
