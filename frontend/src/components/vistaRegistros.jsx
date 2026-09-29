@@ -15,7 +15,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   const { user } = useUser();
   const [pendientes, setPendientes] = useState([]);
 
-  // 📅 Nuevo estado para el período seleccionado
+  // 📅 Estado para el período seleccionado
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('TODOS');
 
   // 🔄 Traer hospitales pendientes de auditar asignados al auditor
@@ -41,11 +41,11 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       .then(json => setHospitales(json))
       .catch(err => {
         console.error('Error cargando hospitales:', err);
-        setHospitales([]); // fallback vacío para evitar más errores
+        setHospitales([]);
       });
   }, []);
 
-  // 🔁 Si está en modo edición de auditoría, traemos auditoría por ID
+  // 🔁 Si está en modo edición de auditoría o listado por tipo
   useEffect(() => {
     if (editarAuditoria) {
       fetch(`${API_URL}/api/auditorias/${id}`)
@@ -54,8 +54,6 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
           return res.json();
         })
         .then((auditoria) => {
-          console.log('AUDITORIA RECIBIDA:', auditoria);
-
           if (Array.isArray(auditoria?.detalles)) {
             const datosConExtras = auditoria.detalles.map((d) => ({
               ...d,
@@ -64,7 +62,6 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
             }));
             setDatos(datosConExtras);
           } else {
-            console.warn('La auditoría no contiene detalles válidos.');
             setDatos([]);
           }
         })
@@ -86,7 +83,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     }
   }, [tipo, editarAuditoria, id]);
 
-  // Función auxiliar para transformar fechas (ej: '15-AUG-24' o 'YYYY-MM') a 'YYYY-MM'
+  // Función auxiliar para transformar fechas a 'YYYY-MM'
   const convertirFechaAPeriodo = (fechaStr) => {
     if (!fechaStr) return null;
     if (/^\d{4}-\d{2}$/.test(fechaStr)) return fechaStr;
@@ -104,15 +101,25 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return fechaStr.slice(0, 7);
   };
 
-  // 📅 Extraer períodos únicos de los datos cargados
+  // 📅 Extraer períodos únicos (tanto de pendientes como de datos generales)
   const periodosDisponibles = useMemo(() => {
+    const fuenteDatos = (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) ? pendientes : datos;
     const setP = new Set(
-      datos.map(d => d.periodo || convertirFechaAPeriodo(d.fecha)).filter(Boolean)
+      fuenteDatos.map(d => d.periodo || convertirFechaAPeriodo(d.fecha)).filter(Boolean)
     );
     return Array.from(setP).sort().reverse();
-  }, [datos]);
+  }, [pendientes, datos, editarAuditoria, tipo, hospitalFiltro]);
 
-  // 🔍 Filtro combinado por hospital y por período
+  // 🔍 Filtrar pendientes por período
+  const pendientesFiltrados = useMemo(() => {
+    if (periodoSeleccionado === 'TODOS') return pendientes;
+    return pendientes.filter(p => {
+      const pItem = p.periodo || convertirFechaAPeriodo(p.fecha);
+      return String(pItem) === String(periodoSeleccionado);
+    });
+  }, [pendientes, periodoSeleccionado]);
+
+  // 🔍 Filtrar datos generales/tabla por hospital y período
   const datosFiltrados = useMemo(() => {
     let resultado = datos;
 
@@ -142,19 +149,34 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return h?.RazonSocial || null;
   }, [hospitalFiltro, hospitales]);
 
-  // 🖥️ Si es vista general de atenciones sin filtro
+  // 🖥️ Si es vista general de atenciones sin filtro (Muestra las tarjetas de hospitales pendientes)
   if (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) {
     return (
       <div style={{ padding: '20px' }}>
         <h2>Hospitales pendientes de auditar</h2>
-        {/* 🛠️ CORRECCIÓN: Usamos estrictamente 'pendientes'. Si el array está vacío, se mostrará vacío y no recurrirá a datos generales */}
-        {pendientes.length === 0 && <p>No hay hospitales pendientes de auditar.</p>}
-        <ListadoHospitales atenciones={Array.isArray(pendientes) ? pendientes : []} />
+
+        {/* 📅 Selector de Período para las Tarjetas Pendientes */}
+        <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
+          <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
+          <select 
+            value={periodoSeleccionado} 
+            onChange={(e) => setPeriodoSeleccionado(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
+          >
+            <option value="TODOS">Todos los períodos</option>
+            {periodosDisponibles.map((p, idx) => (
+              <option key={idx} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        {pendientesFiltrados.length === 0 && <p>No hay hospitales pendientes para el período seleccionado.</p>}
+        <ListadoHospitales atenciones={Array.isArray(pendientesFiltrados) ? pendientesFiltrados : []} />
       </div>
     );
   }
 
-  // 📋 Vista principal de registros (listado o edición)
+  // 📋 Vista principal de registros cuando ya se seleccionó un hospital o tipo específico
   return (
     <div style={{ padding: '20px' }}>
       <h2>
@@ -167,7 +189,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
         {hospitalFiltro && nombreHospital && ` - Hospital: ${nombreHospital}`}
       </h2>
 
-      {/* 📅 Selector de Filtro por Período */}
+      {/* 📅 Selector de Período para la Tabla */}
       <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
         <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
         <select 
