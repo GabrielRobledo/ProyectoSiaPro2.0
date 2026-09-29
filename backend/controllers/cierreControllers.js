@@ -136,7 +136,7 @@ const crearCierreMasivo = (periodo, efectoresIds, idUsuario) => {
         });
       });
     });
-  },
+  };
 
 const efectoresConCierre = (req, res) => {
   const { periodo } = req.query;
