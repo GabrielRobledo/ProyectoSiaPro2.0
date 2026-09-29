@@ -4,70 +4,84 @@ const borradoresModel = require('../models/auditoriasProgresoModels');
 const resumenModel = require('../models/auditoriaModels');
 
 exports.crearAuditoria = (req, res) => {
-  const { periodo, idEfector, totalDebito, detalles } = req.body;
+  const { idEfector, totalDebito, detalles } = req.body;
+  // Ya no dependemos estrictamente del req.body.periodo enviado por el front
 
-  if (!periodo || !idEfector || !detalles || detalles.length === 0) {
+  if (!idEfector || !detalles || detalles.length === 0) {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
   }
 
-  // 🔍 PASO CLAVE: Consultamos quién es el usuario actual en la tabla de progreso 
-  // (esto garantiza que si fue reasignado, obtengamos el ID del auditor nuevo).
-  db.query(
-    'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
-    [idEfector, periodo],
-    (errProg, progRows) => {
-      if (errProg) {
-        console.error(errProg);
-        return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
-      }
+  // 1. Extraemos los idAtencion que vienen en los detalles
+  const idsAtenciones = detalles.map(d => d.idAtencion);
 
-      // Si existe un registro en progreso, usamos ese idUsuario (el nuevo). 
-      // Si por alguna razón no está, recurrimos al que viene por req.body.
-      const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
+  // 2. Consultamos la fecha de la primera atención para determinar el periodo real
+  const sqlPeriodo = 'SELECT DATE_FORMAT(fecha, "%Y-%m") AS periodoReal FROM atenciones WHERE idAtencion IN (?) LIMIT 1';
 
-      if (!idUsuarioFinal) {
-        return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
-      }
+  db.query(sqlPeriodo, [idsAtenciones], (errPer, perRows) => {
+    if (errPer || perRows.length === 0) {
+      console.error(errPer);
+      return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
+    }
 
-      db.beginTransaction((err) => {
-        if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
+    const periodoReal = perRows[0].periodoReal;
 
-        db.query(
-          'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
-          [periodo, idUsuarioFinal, idEfector, totalDebito],
-          (err, result) => {
-            if (err) return db.rollback(() => {
-              console.error(err);
-              res.status(500).json({ mensaje: 'Error al guardar auditoría' });
-            });
+    // 3. Verificamos quién es el usuario actual en la tabla de progreso usando el periodo real
+    db.query(
+      'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
+      [idEfector, periodoReal],
+      (errProg, progRows) => {
+        if (errProg) {
+          console.error(errProg);
+          return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
+        }
 
-            const idAuditoria = result.insertId;
-            const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
+        const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
 
-            db.query(
-              'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
-              [inserts],
-              (err) => {
-                if (err) return db.rollback(() => {
-                  console.error(err);
-                  res.status(500).json({ mensaje: 'Error al guardar detalles' });
-                });
+        if (!idUsuarioFinal) {
+          return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
+        }
 
-                db.commit((err) => {
+        db.beginTransaction((err) => {
+          if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
+
+          // 4. Insertamos usando el `periodoReal` calculado de las atenciones y no el del body
+          db.query(
+            'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
+            [periodoReal, idUsuarioFinal, idEfector, totalDebito],
+            (err, result) => {
+              if (err) return db.rollback(() => {
+                console.error(err);
+                res.status(500).json({ mensaje: 'Error al guardar auditoría' });
+              });
+
+              const idAuditoria = result.insertId;
+              const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
+
+              db.query(
+                'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
+                [inserts],
+                (err) => {
                   if (err) return db.rollback(() => {
                     console.error(err);
-                    res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                    res.status(500).json({ mensaje: 'Error al guardar detalles' });
                   });
 
-                  res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria });
-                });
-              }
-            );
-          }
-        );
-      });
-    }
-  );
+                  db.commit((err) => {
+                    if (err) return db.rollback(() => {
+                      console.error(err);
+                      res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                    });
+
+                    res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria, periodo: periodoReal });
+                  });
+                }
+              );
+            }
+          );
+        });
+      }
+    );
+  });
 };
 
 exports.listarAuditorias = (req, res) => {
