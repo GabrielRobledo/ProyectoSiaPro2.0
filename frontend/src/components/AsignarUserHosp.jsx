@@ -120,7 +120,7 @@ const AsignarHospitales = () => {
     }
   }, [periodosDisponibles, periodoSeleccionado]);
 
-  // 🏥 Filtrar los hospitales disponibles según el período seleccionado y los ya asignados
+// 🏥 Filtrar los hospitales disponibles según el período, los ya asignados en BD y los asignados localmente en pantalla
   useEffect(() => {
     if (!auditorId) {
       setAsignados([]);
@@ -139,17 +139,21 @@ const AsignarHospitales = () => {
         .map(a => a.idEfector)
     );
 
-    // 2. Traer las asignaciones actuales del auditor
+    // 2. Traer las asignaciones actuales del auditor desde la API
     axios.get(`${API_URL}/api/asignaciones/${auditorId}`)
       .then(res => {
-        const idsAsignados = res.data.map(a => a.idEfector);
+        const idsAsignadosBD = res.data.map(a => a.idEfector);
         
-        // Hospitales ya asignados al auditor
-        setAsignados(efectores.filter(e => idsAsignados.includes(e.idEfector)));
+        // Hospitales ya asignados al auditor (iniciales de BD)
+        const hospitalAsignadosBD = efectores.filter(e => idsAsignadosBD.includes(e.idEfector));
+        setAsignados(hospitalAsignadosBD);
 
-        // Hospitales disponibles: que estén en el período seleccionado Y que no estén ya asignados
+        // Obtenemos los IDs que ya están en el estado local 'asignados' por si el usuario acaba de mover alguno
+        const idsAsignadosActuales = new Set(hospitalAsignadosBD.map(e => e.idEfector));
+
+        // Hospitales disponibles: en el período, y que NO estén asignados en BD ni en la selección actual de la UI
         const filtradosPorPeriodo = efectores.filter(e => 
-          efectoresIdsEnPeriodo.has(e.idEfector) && !idsAsignados.includes(e.idEfector)
+          efectoresIdsEnPeriodo.has(e.idEfector) && !idsAsignadosActuales.has(e.idEfector)
         );
         setDisponibles(filtradosPorPeriodo);
       })
@@ -159,14 +163,20 @@ const AsignarHospitales = () => {
       });
   }, [auditorId, efectores, atenciones, periodoSeleccionado]);
 
+  // Modificar la función asignar para que filtre correctamente al instante
   const asignar = (idEfector) => {
     const seleccionado = disponibles.find(e => e.idEfector === idEfector);
+    if (!seleccionado) return;
+    
     setAsignados(prev => [...prev, seleccionado]);
     setDisponibles(prev => prev.filter(e => e.idEfector !== idEfector));
   };
 
+  // Modificar la función quitar para devolverlo a disponibles al instante
   const quitar = (idEfector) => {
     const seleccionado = asignados.find(e => e.idEfector === idEfector);
+    if (!seleccionado) return;
+
     setDisponibles(prev => [...prev, seleccionado]);
     setAsignados(prev => prev.filter(e => e.idEfector !== idEfector));
   };
