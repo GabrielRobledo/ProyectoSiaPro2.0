@@ -130,10 +130,10 @@ const Dashboard = () => {
   }, []);
 
   // KPIs
-  const totalAtenciones = atenciones.length;
-  const totalFacturado = atenciones.reduce((acc, item) => acc + (item.valorTotal || 0), 0);
-  const totalEfectoresAtendidos = new Set(atenciones.map(a => a.idEfector)).size;
-  const totalBeneficiarios = new Set(atenciones.map(a => a.apeYnom)).size;
+  const totalAtenciones = atencionesFiltradasPeriodo.length;
+  const totalFacturado = atencionesFiltradasPeriodo.reduce((acc, item) => acc + (item.valorTotal || 0), 0);
+  const totalEfectoresAtendidos = new Set(atencionesFiltradasPeriodo.map(a => a.idEfector)).size;
+  const totalBeneficiarios = new Set(atencionesFiltradasPeriodo.map(a => a.apeYnom)).size;
 
   const auditores = usuarios.filter(u => u.tipoUsuario === 'auditor');
   const auditoresAsignados = new Set(asignaciones.map(a => a.idUsuario));
