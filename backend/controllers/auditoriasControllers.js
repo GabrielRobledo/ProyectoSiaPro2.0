@@ -5,8 +5,6 @@ const resumenModel = require('../models/auditoriaModels');
 
 exports.crearAuditoria = (req, res) => {
   const { idEfector, totalDebito, detalles, idUsuario } = req.body;
-  console.log("🔍 [DEBUG BACKEND] idUsuario recibido en req.body:", idUsuario);
-  console.log("🔍 [DEBUG BACKEND] req.body completo:", req.body);
 
   if (!idEfector || !detalles || detalles.length === 0) {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
@@ -37,15 +35,16 @@ exports.crearAuditoria = (req, res) => {
 
     // 3. Continuamos con la verificación en progreso y la transacción normal usando 'periodoReal'
     db.query(
-      'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ? AND periodo = ?',
-      [idEfector, periodoReal],
+      'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ?',
+      [idEfector],
       (errProg, progRows) => {
         if (errProg) {
           console.error('Error al verificar progreso:', errProg);
           return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
         }
 
-        const idUsuarioFinal = req.body.idUsuario;
+        // Si hay un progreso registrado para este efector, usamos ese idUsuario, sino el del body
+        const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
 
         if (!idUsuarioFinal) {
           return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
