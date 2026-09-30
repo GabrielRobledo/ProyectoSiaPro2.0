@@ -4,7 +4,9 @@ const borradoresModel = require('../models/auditoriasProgresoModels');
 const resumenModel = require('../models/auditoriaModels');
 
 exports.crearAuditoria = (req, res) => {
-  const { idEfector, totalDebito, detalles } = req.body;
+  const { idEfector, totalDebito, detalles, idUsuario } = req.body;
+  console.log("🔍 [DEBUG BACKEND] idUsuario recibido en req.body:", idUsuario);
+  console.log("🔍 [DEBUG BACKEND] req.body completo:", req.body);
 
   if (!idEfector || !detalles || detalles.length === 0) {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
