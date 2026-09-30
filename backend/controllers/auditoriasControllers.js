@@ -43,7 +43,7 @@ exports.crearAuditoria = (req, res) => {
           return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
         }
 
-        const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
+        const idUsuarioFinal = req.body.idUsuario;
 
         if (!idUsuarioFinal) {
           return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
