@@ -32,8 +32,7 @@ const AsignarHospitales = () => {
   const [disponibles, setDisponibles] = useState([]);
   const [tabIndex, setTabIndex] = useState(0);
   const [usuariosLibres, setUsuariosLibres] = useState([]);
-  // Al cargar los datos en fetchData(), puedes extraer esto:
-  const todosLosEfectoresAsignadosGlobales = new Set(asignacionesRes.data.map(a => a.idEfector));
+  const [efectoresYaAsignadosGlobales, setEfectoresYaAsignadosGlobales] = useState(new Set());
   // 📅 Estado para el período del filtro
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
 
@@ -53,6 +52,7 @@ const AsignarHospitales = () => {
 
       setAtenciones(atencionesData);
       setEfectores(efectoresData);
+      setEfectoresYaAsignadosGlobales(new Set(asignacionesData.map(a => a.idEfector)));
 
       const auditores = usuariosData.filter(u => u.tipoUsuario === 'auditor');
       const auditoresAsignados = new Set(asignacionesData.map(a => a.idUsuario));
@@ -121,7 +121,7 @@ const AsignarHospitales = () => {
     }
   }, [periodosDisponibles, periodoSeleccionado]);
 
-// 🏥 Filtrar los hospitales disponibles según el período, los ya asignados en BD y los asignados localmente en pantalla
+// 🏥 Filtrar los hospitales disponibles según el período y que NO estén asignados a ningún auditor
   useEffect(() => {
     if (!auditorId) {
       setAsignados([]);
@@ -149,12 +149,14 @@ const AsignarHospitales = () => {
         const hospitalAsignadosBD = efectores.filter(e => idsAsignadosBD.includes(e.idEfector));
         setAsignados(hospitalAsignadosBD);
 
-        // Obtenemos los IDs que ya están en el estado local 'asignados' por si el usuario acaba de mover alguno
+        // Obtenemos los IDs que ya están en el estado local 'asignados'
         const idsAsignadosActuales = new Set(hospitalAsignadosBD.map(e => e.idEfector));
 
-        // Hospitales disponibles: en el período, y que NO estén asignados a NADIE en todo el sistema
+        // 3. Hospitales disponibles: en el período, y que NO estén asignados a NADIE en todo el sistema
         const filtradosPorPeriodo = efectores.filter(e => 
-          efectoresIdsEnPeriodo.has(e.idEfector) && !todosLosEfectoresAsignadosGlobales.has(e.idEfector)
+          efectoresIdsEnPeriodo.has(e.idEfector) && 
+          !idsAsignadosActuales.has(e.idEfector) &&
+          !efectoresYaAsignadosGlobales.has(e.idEfector) // 🔑 Exclusión global
         );
         setDisponibles(filtradosPorPeriodo);
       })
@@ -162,7 +164,7 @@ const AsignarHospitales = () => {
         setAsignados([]);
         setDisponibles([]);
       });
-    }, [auditorId, efectores, atenciones, periodoSeleccionado]);
+  }, [auditorId, efectores, atenciones, periodoSeleccionado, efectoresYaAsignadosGlobales]);
 
   // Modificar la función asignar para que filtre correctamente al instante
   const asignar = (idEfector) => {
