@@ -174,12 +174,34 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
           </select>
         </div>
 
-        {/* Mensaje condicional según la selección */}
+        {/* Mensaje condicional inicial */}
         {periodoSeleccionado === '' ? (
           <div style={{ padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px dashed #ccc', color: '#666', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: '15px' }}>Por favor, seleccione un período para visualizar los hospitales pendientes de auditar.</p>
           </div>
+        ) : periodoSeleccionado === 'TODOS' ? (
+          // 🗂️ Si elige "TODOS", agrupamos y mostramos por secciones de período
+          <div>
+            {periodosDisponibles.map((periodo) => {
+              const itemsDelPeriodo = pendientes.filter(p => {
+                const pItem = p.periodo || convertirFechaAPeriodo(p.fecha);
+                return String(pItem) === String(periodo);
+              });
+
+              if (itemsDelPeriodo.length === 0) return null;
+
+              return (
+                <div key={periodo} style={{ marginBottom: '30px' }}>
+                  <h3 style={{ borderBottom: '2px solid #0288d1', paddingBottom: '8px', color: '#0288d1', marginBottom: '15px' }}>
+                    📅 Período: {periodo}
+                  </h3>
+                  <ListadoHospitales atenciones={itemsDelPeriodo} />
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          // 📄 Si elige un período específico
           <>
             {pendientesFiltrados.length === 0 && <p>No hay hospitales pendientes para el período seleccionado.</p>}
             <ListadoHospitales atenciones={Array.isArray(pendientesFiltrados) ? pendientesFiltrados : []} />
