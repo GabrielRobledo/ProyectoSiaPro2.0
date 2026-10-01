@@ -26,76 +26,102 @@ exports.crearAuditoria = (req, res) => {
       return res.status(500).json({ mensaje: 'No se pudo determinar el periodo de las atenciones' });
     }
 
-    // 2. Extraemos correctamente el alias 'periodoReal' que viene de la consulta
-    const periodoReal = perRows[0].periodoReal;
+    let periodoCalculado = perRows[0].periodoReal;
 
-    if (!periodoReal) {
+    if (!periodoCalculado) {
       return res.status(400).json({ mensaje: 'El formato de la fecha de la atención no es válido para calcular el periodo' });
     }
 
-    // 3. Continuamos con la verificación en progreso y la transacción normal usando 'periodoReal'
-    db.query(
-      'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ?',
-      [idEfector],
-      (errProg, progRows) => {
-        if (errProg) {
-          console.error('Error al verificar progreso:', errProg);
-          return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
+    // 2. Controlamos si ya existe un cierre general para este efector y período
+    const sqlVerificarCierre = `
+      SELECT idCierre FROM cierres_generales 
+      WHERE idEfector = ? AND periodo = ?
+      LIMIT 1
+    `;
+
+    db.query(sqlVerificarCierre, [idEfector, periodoCalculado], (errCierre, cierreRows) => {
+      if (errCierre) {
+        console.error('Error al verificar cierres generales:', errCierre);
+        return res.status(500).json({ mensaje: 'Error al verificar el estado de cierre del período' });
+      }
+
+      // Si ya hay un cierre general para este período, calculamos el período siguiente
+      if (cierreRows.length > 0) {
+        const [anio, mes] = periodoCalculado.split('-').map(Number);
+        let nuevoMes = mes + 1;
+        let nuevoAnio = anio;
+        
+        if (nuevoMes > 12) {
+          nuevoMes = 1;
+          nuevoAnio += 1;
         }
+        
+        periodoCalculado = `${nuevoAnio}-${String(nuevoMes).padStart(2, '0')}`;
+      }
 
-        // Si hay un progreso registrado para este efector, usamos ese idUsuario, sino el del body
-        const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
+      // 3. Verificamos el progreso del auditor como se venía haciendo
+      db.query(
+        'SELECT idUsuario FROM auditoria_en_progreso WHERE idEfector = ?',
+        [idEfector],
+        (errProg, progRows) => {
+          if (errProg) {
+            console.error('Error al verificar progreso:', errProg);
+            return res.status(500).json({ mensaje: 'Error al verificar el auditor en progreso' });
+          }
 
-        if (!idUsuarioFinal) {
-          return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
-        }
+          const idUsuarioFinal = progRows.length > 0 ? progRows[0].idUsuario : req.body.idUsuario;
 
-        db.beginTransaction((err) => {
-          if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
+          if (!idUsuarioFinal) {
+            return res.status(400).json({ mensaje: 'No se pudo determinar el auditor responsable' });
+          }
 
-          // 4. Insertamos la auditoría con el periodo real calculado ('YYYY-MM')
-          db.query(
-            'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
-            [periodoReal, idUsuarioFinal, idEfector, totalDebito],
-            (errIns, result) => {
-              if (errIns) {
-                return db.rollback(() => {
-                  console.error('Error al insertar auditoria:', errIns);
-                  res.status(500).json({ mensaje: 'Error al guardar auditoría' });
-                });
-              }
+          db.beginTransaction((err) => {
+            if (err) return res.status(500).json({ mensaje: 'Error iniciando transacción' });
 
-              const idAuditoria = result.insertId;
-              const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
+            // 4. Insertamos la auditoría con el periodo final (el original o el desplazado al mes siguiente)
+            db.query(
+              'INSERT INTO auditoria (periodo, idUsuario, idEfector, totalDebito) VALUES (?, ?, ?, ?)',
+              [periodoCalculado, idUsuarioFinal, idEfector, totalDebito],
+              (errIns, result) => {
+                if (errIns) {
+                  return db.rollback(() => {
+                    console.error('Error al insertar auditoria:', errIns);
+                    res.status(500).json({ mensaje: 'Error al guardar auditoría' });
+                  });
+                }
 
-              db.query(
-                'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
-                [inserts],
-                (errDet) => {
-                  if (errDet) {
-                    return db.rollback(() => {
-                      console.error('Error al insertar detalles:', errDet);
-                      res.status(500).json({ mensaje: 'Error al guardar detalles' });
-                    });
-                  }
+                const idAuditoria = result.insertId;
+                const inserts = detalles.map((d) => [d.idAtencion, idAuditoria, d.idMotivo || null, d.debito]);
 
-                  db.commit((errCom) => {
-                    if (errCom) {
+                db.query(
+                  'INSERT INTO `detalle-auditoria` (idAtencion, idAuditoria, idMotivo, importe) VALUES ?',
+                  [inserts],
+                  (errDet) => {
+                    if (errDet) {
                       return db.rollback(() => {
-                        console.error('Error al hacer commit:', errCom);
-                        res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                        console.error('Error al insertar detalles:', errDet);
+                        res.status(500).json({ mensaje: 'Error al guardar detalles' });
                       });
                     }
 
-                    res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria, periodo: periodoReal });
-                  });
-                }
-              );
-            }
-          );
-        });
-      }
-    );
+                    db.commit((errCom) => {
+                      if (errCom) {
+                        return db.rollback(() => {
+                          console.error('Error al hacer commit:', errCom);
+                          res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                        });
+                      }
+
+                      res.json({ mensaje: 'Auditoría registrada con éxito', idAuditoria, periodo: periodoCalculado });
+                    });
+                  }
+                );
+              }
+            );
+          });
+        }
+      );
+    });
   });
 };
 
