@@ -32,7 +32,8 @@ const AsignarHospitales = () => {
   const [disponibles, setDisponibles] = useState([]);
   const [tabIndex, setTabIndex] = useState(0);
   const [usuariosLibres, setUsuariosLibres] = useState([]);
-  
+  // Al cargar los datos en fetchData(), puedes extraer esto:
+  const todosLosEfectoresAsignadosGlobales = new Set(asignacionesRes.data.map(a => a.idEfector));
   // 📅 Estado para el período del filtro
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
 
@@ -151,9 +152,9 @@ const AsignarHospitales = () => {
         // Obtenemos los IDs que ya están en el estado local 'asignados' por si el usuario acaba de mover alguno
         const idsAsignadosActuales = new Set(hospitalAsignadosBD.map(e => e.idEfector));
 
-        // Hospitales disponibles: en el período, y que NO estén asignados en BD ni en la selección actual de la UI
+        // Hospitales disponibles: en el período, y que NO estén asignados a NADIE en todo el sistema
         const filtradosPorPeriodo = efectores.filter(e => 
-          efectoresIdsEnPeriodo.has(e.idEfector) && !idsAsignadosActuales.has(e.idEfector)
+          efectoresIdsEnPeriodo.has(e.idEfector) && !todosLosEfectoresAsignadosGlobales.has(e.idEfector)
         );
         setDisponibles(filtradosPorPeriodo);
       })
@@ -161,7 +162,7 @@ const AsignarHospitales = () => {
         setAsignados([]);
         setDisponibles([]);
       });
-  }, [auditorId, efectores, atenciones, periodoSeleccionado]);
+    }, [auditorId, efectores, atenciones, periodoSeleccionado]);
 
   // Modificar la función asignar para que filtre correctamente al instante
   const asignar = (idEfector) => {
