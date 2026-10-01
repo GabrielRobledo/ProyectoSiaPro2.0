@@ -100,7 +100,7 @@ exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
     let sqlQuery = '';
     let queryParams = [];
 
-    // Si es Administrador (1): Trae todas las atenciones de hospitales que NO tienen cierres ni borradores
+    // Si es Administrador (1): Trae todas las atenciones de hospitales que NO tienen cierres, ni borradores, NI están ya asignados a ningún auditor
     if (idTipoUsuario === 1) {
       sqlQuery = `
         SELECT a.*, e.RazonSocial, 0 AS reasignado
@@ -108,6 +108,7 @@ exports.ObtenerAsignacionesSinAuditoria = (req, res) => {
         JOIN efectores e ON a.idEfector = e.idEfector
         WHERE a.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria)
           AND a.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditoria_en_progreso)
+          AND a.idEfector NOT IN (SELECT COALESCE(idEfector, 0) FROM auditor_efector) -- 🔑 EXCLUIR HOSPITALES YA ASIGNADOS
         ORDER BY a.idAtencion ASC
       `;
       queryParams = [];
