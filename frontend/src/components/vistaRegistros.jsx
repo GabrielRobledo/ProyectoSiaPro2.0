@@ -18,18 +18,13 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   // 📅 Estado para el período seleccionado
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
 
-  // 🔄 Traer hospitales pendientes de auditar asignados al auditor
+// 🔄 Traer hospitales pendientes de auditar asignados al auditor
   useEffect(() => {
     if (user?.idUsuario) {
       fetch(`${API_URL}/api/asignaciones-sin-auditoria/${user.idUsuario}`)
         .then(res => res.json())
         .then(data => {
-          // 🧪 [PRUEBA] Inyectamos un elemento con período ficticio para testear
-          const datosConPrueba = [
-            ...data,
-            { idEfector: 999, RazonSocial: 'HOSPITAL FICTICIO DE PRUEBA', periodo: '2026-12', fecha: '15-DEC-26' }
-          ];
-          setPendientes(datosConPrueba);
+          setPendientes(data); // 👈 Guardamos directamente los datos reales de la API
         })
         .catch(err => {
           setPendientes([]);
