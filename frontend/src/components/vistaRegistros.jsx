@@ -16,7 +16,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   const [pendientes, setPendientes] = useState([]);
 
   // 📅 Estado para el período seleccionado
-  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('TODOS');
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState('');
 
   // 🔄 Traer hospitales pendientes de auditar asignados al auditor
   useEffect(() => {
@@ -118,13 +118,14 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
   }, [pendientes, datos, editarAuditoria, tipo, hospitalFiltro]);
 
   // 🔍 Filtrar pendientes por período
-  const pendientesFiltrados = useMemo(() => {
-    if (periodoSeleccionado === 'TODOS') return pendientes;
-    return pendientes.filter(p => {
-      const pItem = p.periodo || convertirFechaAPeriodo(p.fecha);
-      return String(pItem) === String(periodoSeleccionado);
-    });
-  }, [pendientes, periodoSeleccionado]);
+    const pendientesFiltrados = useMemo(() => {
+      if (periodoSeleccionado === '') return [];
+      if (periodoSeleccionado === 'TODOS') return pendientes;
+      return pendientes.filter(p => {
+        const pItem = p.periodo || convertirFechaAPeriodo(p.fecha);
+        return String(pItem) === String(periodoSeleccionado);
+      });
+    }, [pendientes, periodoSeleccionado]);
 
   // 🔍 Filtrar datos generales/tabla por hospital y período
   const datosFiltrados = useMemo(() => {
@@ -156,7 +157,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
     return h?.RazonSocial || null;
   }, [hospitalFiltro, hospitales]);
 
-  // 🖥️ Si es vista general de atenciones sin filtro
+// 🖥️ Si es vista general de atenciones sin filtro
   if (!editarAuditoria && tipo === 'atenciones' && !hospitalFiltro) {
     return (
       <div style={{ padding: '20px' }}>
@@ -170,6 +171,7 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
             onChange={(e) => setPeriodoSeleccionado(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
           >
+            <option value="">Seleccione un período...</option>
             <option value="TODOS">Todos los períodos</option>
             {periodosDisponibles.map((p, idx) => (
               <option key={idx} value={p}>{p}</option>
@@ -177,8 +179,17 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
           </select>
         </div>
 
-        {pendientesFiltrados.length === 0 && <p>No hay hospitales pendientes para el período seleccionado.</p>}
-        <ListadoHospitales atenciones={Array.isArray(pendientesFiltrados) ? pendientesFiltrados : []} />
+        {/* Mensaje condicional según la selección */}
+        {periodoSeleccionado === '' ? (
+          <div style={{ padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px dashed #ccc', color: '#666', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '15px' }}>Por favor, seleccione un período para visualizar los hospitales pendientes de auditar.</p>
+          </div>
+        ) : (
+          <>
+            {pendientesFiltrados.length === 0 && <p>No hay hospitales pendientes para el período seleccionado.</p>}
+            <ListadoHospitales atenciones={Array.isArray(pendientesFiltrados) ? pendientesFiltrados : []} />
+          </>
+        )}
       </div>
     );
   }

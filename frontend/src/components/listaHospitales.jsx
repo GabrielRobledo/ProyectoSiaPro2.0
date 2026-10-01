@@ -74,11 +74,13 @@ const ListadoHospitales = ({ atenciones }) => {
             <h3 className="card-title">{RazonSocial || 'Desconocido'}</h3>
           </div>
           <ul className="card-list">
-            {tiposAtencionUnicos.map((tipo) => (
-              <li key={tipo}>
-                <strong>{tipo}:</strong> {conteos[tipo] || 0}
-              </li>
-            ))}
+            {tiposAtencionUnicos
+              .filter((tipo) => tipo) 
+              .map((tipo) => (
+                <li key={tipo}>
+                  <strong>{tipo}:</strong> {conteos[tipo] || 0}
+                </li>
+              ))}
           </ul>
         </div>
       ))}
