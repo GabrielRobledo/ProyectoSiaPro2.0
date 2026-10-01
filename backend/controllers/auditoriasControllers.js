@@ -103,11 +103,13 @@ exports.listarAuditorias = (req, res) => {
   db.query(`
     SELECT 
       a.idAuditoria, e.RazonSocial, a.periodo, a.idUsuario, a.idEfector, a.totalDebito,
+      u.nombre AS nombreAuditor,
       da.idAtencion, da.importe AS debito, at.valorTotal
     FROM auditoria as a
     JOIN \`detalle-auditoria\` as da ON a.idAuditoria = da.idAuditoria 
     JOIN efectores as e ON e.idEfector = a.idEfector 
     JOIN atenciones as at ON da.idAtencion = at.idAtencion
+    LEFT JOIN usuarios as u ON a.idUsuario = u.idUsuario
     LEFT JOIN motivos m ON da.idMotivo = m.idMotivo
     ORDER BY a.idAuditoria DESC;
   `, (err, rows) => {
@@ -120,6 +122,7 @@ exports.listarAuditorias = (req, res) => {
           Hospital: r.RazonSocial,
           periodo: r.periodo,
           idUsuario: r.idUsuario,
+          nombreAuditor: r.nombreAuditor || 'Desconocido', // 👈 Aquí se incluye el nombre del auditor
           idEfector: r.idEfector,
           totalDebito: r.totalDebito,
           totalFacturado: 0, 
@@ -138,7 +141,6 @@ exports.listarAuditorias = (req, res) => {
     res.json(Object.values(result));
   });
 };
-
 
 exports.obtenerAuditoria = async (req, res) => {
   const { id } = req.params;

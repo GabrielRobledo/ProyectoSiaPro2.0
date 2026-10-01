@@ -108,6 +108,8 @@ export default function AuditoriasList() {
     { accessorKey: 'idAuditoria', header: 'ID' },
     { accessorKey: 'Hospital', header: 'Hospital' },
     { accessorKey: 'periodo', header: 'Periodo' },
+    //quiero el nombre del auditor en vez del idUsuario
+    { accessorKey: 'nombreAuditor', header: 'Auditor' },
     {
       accessorKey: 'totalFacturado', 
       header: 'Total Facturado', 
