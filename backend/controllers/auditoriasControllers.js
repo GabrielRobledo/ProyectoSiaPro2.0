@@ -32,21 +32,21 @@ exports.crearAuditoria = (req, res) => {
       return res.status(400).json({ mensaje: 'El formato de la fecha de la atención no es válido para calcular el periodo' });
     }
 
-    // 2. Controlamos si ya existe un cierre general para este efector y período
+    // 2. Controlamos si ya existe CUALQUIER cierre general para ese período
     const sqlVerificarCierre = `
-      SELECT idCierre FROM cierres_generales 
-      WHERE idEfector = ? AND periodo = ?
-      LIMIT 1
+      SELECT COUNT(*) AS total 
+      FROM cierres_generales 
+      WHERE periodo = ?
     `;
 
-    db.query(sqlVerificarCierre, [idEfector, periodoCalculado], (errCierre, cierreRows) => {
+    db.query(sqlVerificarCierre, [periodoCalculado], (errCierre, cierreRows) => {
       if (errCierre) {
         console.error('Error al verificar cierres generales:', errCierre);
         return res.status(500).json({ mensaje: 'Error al verificar el estado de cierre del período' });
       }
 
-      // Si ya hay un cierre general para este período, calculamos el período siguiente
-      if (cierreRows.length > 0) {
+      // Si ya hay un cierre general hecho para este período, pasamos al mes siguiente
+      if (cierreRows[0].total > 0) {
         const [anio, mes] = periodoCalculado.split('-').map(Number);
         let nuevoMes = mes + 1;
         let nuevoAnio = anio;
@@ -108,7 +108,7 @@ exports.crearAuditoria = (req, res) => {
                       if (errCom) {
                         return db.rollback(() => {
                           console.error('Error al hacer commit:', errCom);
-                          res.status(500).json({ mensaje: 'Error al confirmar transacción' });
+                          res.status(500).json({ mensaje: 'Error al confirmar transacción'});
                         });
                       }
 
