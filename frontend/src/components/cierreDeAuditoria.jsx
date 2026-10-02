@@ -82,18 +82,25 @@ const CierreDeAuditoria = ({ idUsuario }) => {
   const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    // Filtramos estrictamente las auditorías que pertenecen al período seleccionado
+    console.log("Período seleccionado:", periodoSeleccionado);
+    console.log("Auditorías cargadas:", auditorias);
+
     const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
+    console.log("Auditorías filtradas para este período:", auditoriasEnPeriodo);
+
     const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
+    console.log("IDs de efectores auditados en este período:", idsEfectoresAuditados);
     
-    // IDs de efectores que ya tienen un cierre general en este período exacto
     const idsEfectoresConCierre = cierres
       .filter(c => String(c.periodo).trim() === String(periodoSeleccionado).trim())
       .map(c => c.idEfector);
 
-    return efectores.filter(
+    const resultado = efectores.filter(
       ef => idsEfectoresAuditados.includes(ef.idEfector) && !idsEfectoresConCierre.includes(ef.idEfector)
     );
+
+    console.log("Efectores pendientes finales:", resultado);
+    return resultado;
   }, [periodoSeleccionado, auditorias, efectores, cierres]);
 
   // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
