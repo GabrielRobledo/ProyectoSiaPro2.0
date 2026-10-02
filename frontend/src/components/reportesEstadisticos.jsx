@@ -283,6 +283,8 @@ const Reportes = () => {
               {resumenPorHospital.map(r => (
                 <tr key={r.Hospital} style={{ borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: "10px" }}>{r.Hospital}</td>
+                  //quiero agregar el periodo
+                  <td style={{ padding: "10px" }}>{r.periodo}</td>
                   <td style={{ padding: "10px" }}>
                     ${r.totalFacturado.toLocaleString("es-AR", { minimumFractionDigits: 2 })}
                   </td>
