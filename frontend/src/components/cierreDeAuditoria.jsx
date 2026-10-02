@@ -72,20 +72,17 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       .catch((err) => console.error('Error al obtener cierres generales:', err));
   };
 
-  // 1. Validar si el período seleccionado ya tiene un cierre general previo
-  const periodoYaCerrado = useMemo(() => {
-    if (!periodoSeleccionado) return false;
-    return cierres.some(c => c.periodo === periodoSeleccionado);
-  }, [periodoSeleccionado, cierres]);
-
   // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
   const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
+    // Filtramos estrictamente las auditorías que pertenecen al período seleccionado
+    const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
     const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
+    
+    // IDs de efectores que ya tienen un cierre general en este período exacto
     const idsEfectoresConCierre = cierres
-      .filter(c => c.periodo === periodoSeleccionado)
+      .filter(c => String(c.periodo).trim() === String(periodoSeleccionado).trim())
       .map(c => c.idEfector);
 
     return efectores.filter(
@@ -93,26 +90,17 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     );
   }, [periodoSeleccionado, auditorias, efectores, cierres]);
 
-  // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
-  const efectoresNoAuditados = useMemo(() => {
-    if (!periodoSeleccionado) return [];
+    // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
+    const efectoresNoAuditados = useMemo(() => {
+      if (!periodoSeleccionado) return [];
 
-    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
-    const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
+      // Obtenemos únicamente las auditorías correspondientes al período seleccionado
+      const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
+      const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
 
-    return efectores.filter(ef => !idsEfectoresAuditados.includes(ef.idEfector));
-  }, [periodoSeleccionado, auditorias, efectores]);
-
-  const generarCierreGeneral = async () => {
-    // Obtenemos el usuario directamente del localStorage de forma segura
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const usuarioIdReal = idUsuario || storedUser?.idUsuario || storedUser?.id;
-
-    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !usuarioIdReal) {
-      Swal.fire('❌ Error', 'Faltan datos o no se pudo identificar al usuario actual.', 'error');
-      return;
-    }
-
+      // Efectores activos que no figuran con auditoría cerrada/en progreso dentro de este período
+      return efectores.filter(ef => !idsEfectoresAuditados.includes(ef.idEfector));
+    }, [periodoSeleccionado, auditorias, efectores]);
     const confirmacion = await Swal.fire({
       title: '¿Confirmar Cierre General?',
       text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores auditados en el periodo ${periodoSeleccionado}.`,
