@@ -120,6 +120,7 @@ const Reportes = () => {
 
    const sf3dData = resumenPorHospital.map(r => ({
     Hospital: r.Hospital,
+    periodo: r.periodo,
     Facturado: r.totalFacturado,
     Debitado: r.totalDebitado
   }));
