@@ -78,38 +78,20 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     return cierres.some(c => c.periodo === periodoSeleccionado);
   }, [periodoSeleccionado, cierres]);
 
-  // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
+// Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
   const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
+    const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
     const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
     const idsEfectoresConCierre = cierres
-      .filter(c => c.periodo === periodoSeleccionado)
+      .filter(c => String(c.periodo).trim() === String(periodoSeleccionado).trim())
       .map(c => c.idEfector);
 
     return efectores.filter(
       ef => idsEfectoresAuditados.includes(ef.idEfector) && !idsEfectoresConCierre.includes(ef.idEfector)
     );
   }, [periodoSeleccionado, auditorias, efectores, cierres]);
-
-// Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
-  const efectoresAuditadosPendientes = useMemo(() => {
-      if (!periodoSeleccionado) return [];
-
-      // Filtramos estrictamente las auditorías que pertenecen al período seleccionado
-      const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
-      const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
-      
-      // IDs de efectores que ya tienen un cierre general en este período exacto
-      const idsEfectoresConCierre = cierres
-        .filter(c => String(c.periodo).trim() === String(periodoSeleccionado).trim())
-        .map(c => c.idEfector);
-
-      return efectores.filter(
-        ef => idsEfectoresAuditados.includes(ef.idEfector) && !idsEfectoresConCierre.includes(ef.idEfector)
-      );
-    }, [periodoSeleccionado, auditorias, efectores, cierres]);
 
 // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
   const efectoresNoAuditados = useMemo(() => {
