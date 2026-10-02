@@ -275,7 +275,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                       size="large"
                       block
                       disabled={efectoresAuditadosPendientes.length === 0}
-                      onClick={generarCierreGeneral}
+                      onClick={crearCierreGeneral}
                       style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
                     >
                       🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
