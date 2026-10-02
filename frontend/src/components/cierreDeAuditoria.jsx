@@ -78,14 +78,14 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     return cierres.some(c => c.periodo === periodoSeleccionado);
   }, [periodoSeleccionado, cierres]);
 
-// Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
+  // Efectores con auditoría en el periodo seleccionado y que aún NO tienen cierre
   const efectoresAuditadosPendientes = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
+    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
     const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
     const idsEfectoresConCierre = cierres
-      .filter(c => String(c.periodo).trim() === String(periodoSeleccionado).trim())
+      .filter(c => c.periodo === periodoSeleccionado)
       .map(c => c.idEfector);
 
     return efectores.filter(
@@ -93,17 +93,52 @@ const CierreDeAuditoria = ({ idUsuario }) => {
     );
   }, [periodoSeleccionado, auditorias, efectores, cierres]);
 
-// Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
+  // Efectores que NO tienen auditoría en el periodo seleccionado (No llegaron)
   const efectoresNoAuditados = useMemo(() => {
     if (!periodoSeleccionado) return [];
 
-    // Obtenemos únicamente las auditorías correspondientes al período seleccionado
-    const auditoriasEnPeriodo = auditorias.filter(a => String(a.periodo).trim() === String(periodoSeleccionado).trim());
+    const auditoriasEnPeriodo = auditorias.filter(a => a.periodo === periodoSeleccionado);
     const idsEfectoresAuditados = [...new Set(auditoriasEnPeriodo.map(a => a.idEfector))];
 
-    // Efectores activos que no figuran con auditoría cerrada/en progreso dentro de este período
     return efectores.filter(ef => !idsEfectoresAuditados.includes(ef.idEfector));
   }, [periodoSeleccionado, auditorias, efectores]);
+
+  const generarCierreGeneral = async () => {
+    // Obtenemos el usuario directamente del localStorage de forma segura
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const usuarioIdReal = idUsuario || storedUser?.idUsuario || storedUser?.id;
+
+    if (!periodoSeleccionado || efectoresAuditadosPendientes.length === 0 || !usuarioIdReal) {
+      Swal.fire('❌ Error', 'Faltan datos o no se pudo identificar al usuario actual.', 'error');
+      return;
+    }
+
+    const confirmacion = await Swal.fire({
+      title: '¿Confirmar Cierre General?',
+      text: `Se generará el cierre masivo para ${efectoresAuditadosPendientes.length} efectores auditados en el periodo ${periodoSeleccionado}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, generar cierre general',
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (!confirmacion.isConfirmed) return;
+
+    try {
+      await axios.post(`${API_URL}/api/cierres-masivos`, {
+        periodo: periodoSeleccionado,
+        efectoresIds: efectoresAuditadosPendientes.map(e => e.idEfector),
+        idUsuario: Number(usuarioIdReal),
+      });
+
+      Swal.fire('✅ Cierre General Exitoso', 'Los cierres del periodo se generaron correctamente.', 'success');
+      setPeriodoSeleccionado('');
+      cargarCierres();
+    } catch (error) {
+      console.error(error);
+      Swal.fire('❌ Error', error.response?.data?.error || 'Hubo un problema al procesar el cierre masivo.', 'error');
+    }
+  };
 
   // Columnas para la tabla con TanStack Table
   const columns = useMemo(
@@ -275,7 +310,7 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                       size="large"
                       block
                       disabled={efectoresAuditadosPendientes.length === 0}
-                      onClick={crearCierreGeneral}
+                      onClick={generarCierreGeneral}
                       style={{ height: '50px', fontWeight: 'bold', fontSize: '16px', borderRadius: '8px' }}
                     >
                       🚀 Ejecutar Cierre General del Periodo ({periodoSeleccionado})
