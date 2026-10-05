@@ -427,7 +427,12 @@ export default function AuditoriasList() {
         </div>
       )}
 
-      <button onClick={()=>navigate('/dashboardAuditor')} style={{position:'absolute',bottom:'20px',left:'20px',padding:'10px 20px',backgroundColor:'#1976d2',color:'#fff',border:'none',borderRadius:'5px',cursor:'pointer'}}>← Volver al Dashboard</button>
+      <button onClick={() => {
+          const rolNormalizado = user?.rol?.toLowerCase().trim();
+          const esAdmin = rolNormalizado === 'administrador' || rolNormalizado === 'admin';
+          navigate(esAdmin ? '/dashboard' : '/dashboardAuditor'); // 👈 Ajusta '/dashboardAdmin' por la ruta real de tu panel de administrador si es distinta
+        }} 
+        style={{position:'absolute',bottom:'20px',left:'20px',padding:'10px 20px',backgroundColor:'#1976d2',color:'#fff',border:'none',borderRadius:'5px',cursor:'pointer'}}>← Volver al Dashboard</button>
       {ampliarGrafico && (
         <div
           onClick={() => setAmpliarGrafico(null)}
