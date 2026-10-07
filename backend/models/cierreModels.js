@@ -236,23 +236,28 @@ eliminarCierreGeneral(idCierreGeneral) {
             });
           });
 
-          // 1. Obtener los IDs de las tablas viejas de cierre asociados a este cierre general (si aplica)
-          // O eliminar directamente por período o ID asociado. 
-          // Como en tu cierre masivo guardas los efectores en `atenciones_cierre`, borramos primero los detalles y cabeceras nuevas:
-          
+          // 1. Borrar de atenciones_cierre (tabla nueva)
           await queryTrans(`DELETE FROM atenciones_cierre WHERE id = ?`, [idCierreGeneral]);
           
-          // Si también guardas en las tablas tradicionales `cierres` y `cierres_detalle`, 
-          // puedes borrar los cierres que coincidan con el período del cierre general:
+          // 2. Obtener el período del cierre general para limpiar las tablas tradicionales
           const cierreGenRows = await queryTrans(`SELECT periodo FROM cierres_generales WHERE id = ?`, [idCierreGeneral]);
+          
           if (cierreGenRows.length > 0) {
             const periodo = cierreGenRows[0].periodo;
             
-            // Borramos de la tabla vieja `cierres` (y por cascada o FK sus detalles si lo configuraste, o manual)
+            // 3. OBTENER LOS IDs DE CIERRES VIEJOS PARA BORRAR SUS DETALLES PRIMERO
+            const cierresViejos = await queryTrans(`SELECT idCierre FROM cierres WHERE periodo = ?`, [periodo]);
+            
+            for (const c of cierresViejos) {
+              // Borramos primero los detalles de la tabla hija
+              await queryTrans(`DELETE FROM cierres_detalle WHERE idCierre = ?`, [c.idCierre]);
+            }
+
+            // 4. Ahora sí, borramos de la tabla padre `cierres`
             await queryTrans(`DELETE FROM cierres WHERE periodo = ?`, [periodo]);
           }
 
-          // 2. Finalmente eliminar la cabecera del cierre general
+          // 5. Finalmente eliminar la cabecera del cierre general
           await queryTrans(`DELETE FROM cierres_generales WHERE id = ?`, [idCierreGeneral]);
 
           db.commit((errCommit) => {
