@@ -240,7 +240,7 @@ eliminarCierreGeneral(idCierreGeneral) {
           // O eliminar directamente por período o ID asociado. 
           // Como en tu cierre masivo guardas los efectores en `atenciones_cierre`, borramos primero los detalles y cabeceras nuevas:
           
-          await queryTrans(`DELETE FROM atenciones_cierre WHERE idCierre = ?`, [idCierreGeneral]);
+          await queryTrans(`DELETE FROM atenciones_cierre WHERE id = ?`, [idCierreGeneral]);
           
           // Si también guardas en las tablas tradicionales `cierres` y `cierres_detalle`, 
           // puedes borrar los cierres que coincidan con el período del cierre general:
