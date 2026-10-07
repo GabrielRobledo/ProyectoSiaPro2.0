@@ -100,6 +100,26 @@ const obtenerDetalleCierre = async (req, res) => {
   }
 };
 
-// Asegúrate de exportarlo junto a los demás
-module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo, obtenerDetalleCierre, listarCierresGenerales };
+const eliminarCierreGeneral = async (req, res) => {
+  try {
+    const { idcierre } = req.params;
+
+    if (!idcierre) {
+      return res.status(400).json({ error: 'Falta el ID del cierre general' });
+    }
+
+    await CierreService.eliminarCierreGeneral(idcierre);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Cierre general eliminado y período reabierto con éxito' 
+    });
+  } catch (err) {
+    console.error('Error en eliminarCierreGeneral:', err);
+    res.status(500).json({ error: 'Error al eliminar el cierre general' });
+  }
+};
+
+module.exports = { crearCierre, efectoresConCierre, listarCierres, crearCierreMasivo, obtenerDetalleCierre, listarCierresGenerales, eliminarCierreGeneral };
+
 

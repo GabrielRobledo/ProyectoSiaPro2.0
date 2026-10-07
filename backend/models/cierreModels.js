@@ -221,6 +221,53 @@ obtenerDetalleCierrePorId(idCierre, callback) {
       WHERE ac.idCierre = ?
     `;
     db.query(sql, [idCierre], callback);
+  },
+
+eliminarCierreGeneral(idCierreGeneral) {
+    return new Promise((resolve, reject) => {
+      db.beginTransaction(async (err) => {
+        if (err) return reject(err);
+
+        try {
+          const queryTrans = (sql, params) => new Promise((res, rej) => {
+            db.query(sql, params, (error, results) => {
+              if (error) return rej(error);
+              res(results);
+            });
+          });
+
+          // 1. Obtener los IDs de las tablas viejas de cierre asociados a este cierre general (si aplica)
+          // O eliminar directamente por período o ID asociado. 
+          // Como en tu cierre masivo guardas los efectores en `atenciones_cierre`, borramos primero los detalles y cabeceras nuevas:
+          
+          await queryTrans(`DELETE FROM atenciones_cierre WHERE idCierre = ?`, [idCierreGeneral]);
+          
+          // Si también guardas en las tablas tradicionales `cierres` y `cierres_detalle`, 
+          // puedes borrar los cierres que coincidan con el período del cierre general:
+          const cierreGenRows = await queryTrans(`SELECT periodo FROM cierres_generales WHERE id = ?`, [idCierreGeneral]);
+          if (cierreGenRows.length > 0) {
+            const periodo = cierreGenRows[0].periodo;
+            
+            // Borramos de la tabla vieja `cierres` (y por cascada o FK sus detalles si lo configuraste, o manual)
+            await queryTrans(`DELETE FROM cierres WHERE periodo = ?`, [periodo]);
+          }
+
+          // 2. Finalmente eliminar la cabecera del cierre general
+          await queryTrans(`DELETE FROM cierres_generales WHERE id = ?`, [idCierreGeneral]);
+
+          db.commit((errCommit) => {
+            if (errCommit) {
+              return db.rollback(() => reject(errCommit));
+            }
+            resolve({ success: true, message: 'Cierre general eliminado correctamente' });
+          });
+
+        } catch (error) {
+          console.error('❌ Error al eliminar cierre general:', error);
+          db.rollback(() => reject(error));
+        }
+      });
+    });
   }
 };
 

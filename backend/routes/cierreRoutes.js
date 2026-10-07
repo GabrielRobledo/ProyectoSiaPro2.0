@@ -10,6 +10,7 @@ router.get('/listarCierres', cierreController.listarCierres);
 router.post('/cierres-masivos', cierreController.crearCierreMasivo);
 router.get('/:idcierre/detalle', cierreController.obtenerDetalleCierre);
 router.get('/listarCierresGenerales', cierreController.listarCierresGenerales);
+router.delete('/cierres-generales/:idcierre', cierreController.eliminarCierreGeneral);
 
 
 module.exports = router;

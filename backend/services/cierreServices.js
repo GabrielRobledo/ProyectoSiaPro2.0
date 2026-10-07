@@ -44,4 +44,13 @@ const obtenerDetalleCierrePorId = (idcierre) => {
   });
 };
 
-module.exports = { crearCierreConDetalle, listarCierres, crearCierreMasivo, obtenerDetalleCierrePorId, listarCierresGenerales };
+const eliminarCierreGeneral = async (idCierreGeneral) => {
+  try {
+    const resultado = await Cierre.eliminarCierreGeneral(idCierreGeneral);
+    return resultado;
+  } catch (error) {
+    throw error;
+  }
+};
+
+module.exports = { crearCierreConDetalle, listarCierres, crearCierreMasivo, obtenerDetalleCierrePorId, listarCierresGenerales, eliminarCierreGeneral };

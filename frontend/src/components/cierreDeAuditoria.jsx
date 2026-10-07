@@ -194,6 +194,30 @@ const CierreDeAuditoria = ({ idUsuario }) => {
       setLoadingDetalle(false);
     }
   };
+
+  const eliminarCierre = async (idCierreGeneral) => {
+    const confirmacion = await Swal.fire({
+      title: '¿Reabrir este período?',
+      text: 'Se eliminará el registro de este cierre general y los efectores volverán a estar disponibles para modificar o generar un nuevo cierre.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar cierre',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+    });
+
+    if (!confirmacion.isConfirmed) return;
+
+    try {
+      await axios.delete(`${API_URL}/api/cierres-generales/${idCierreGeneral}`);
+      Swal.fire('✅ Período Reabierto', 'El cierre general ha sido eliminado correctamente.', 'success');
+      cargarCierres(); // Recarga la lista de cierres
+      setModalVisible(false);
+    } catch (error) {
+      console.error(error);
+      Swal.fire('❌ Error', error.response?.data?.error || 'Hubo un problema al eliminar el cierre.', 'error');
+    }
+  };
   return (
       <div style={{ maxWidth: 1100, margin: '40px auto', padding: 32, background: '#fff', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,0.05)' }}>
         
@@ -358,6 +382,14 @@ const CierreDeAuditoria = ({ idUsuario }) => {
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>{cierre.total_atenciones}</td>
                         <td style={{ padding: '12px 16px' }}>{cierre.usuario}</td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                         <Button 
+                            type="danger" // o danger en Ant Design
+                            danger
+                            size="small"
+                            onClick={() => eliminarCierre(cierre.idCierreGeneral)}
+                          >
+                            Eliminar / Reabrir
+                          </Button> 
                           <Button 
                             type="primary" 
                             ghost 
