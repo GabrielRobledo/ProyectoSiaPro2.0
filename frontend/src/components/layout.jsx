@@ -51,11 +51,23 @@ const BasicLayout = () => {
 
   // 🍞 Lógica para generar las migajas de pan de forma automática según la URL actual
   const pathSnippets = location.pathname.split('/').filter((i) => i);
+
   const extraBreadcrumbItems = pathSnippets.map((snippet, index) => {
     const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
+    
+    // Lista de segmentos que actúan como menús desplegables / contenedores sin vista propia
+    const rutasSinVista = ['registros', 'auditorias', 'reportes']; 
+    const esContenedor = rutasSinVista.includes(snippet.toLowerCase());
+
     return (
       <Breadcrumb.Item key={url}>
-        <Link to={url}>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</Link>
+        {esContenedor || index === pathSnippets.length - 1 ? (
+          // Si es un menú contenedor o la última página actual, se muestra como texto plano
+          <span>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</span>
+        ) : (
+          // Si tiene una vista válida, mantiene el enlace
+          <Link to={url}>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</Link>
+        )}
       </Breadcrumb.Item>
     );
   });
