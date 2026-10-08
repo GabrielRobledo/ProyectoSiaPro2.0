@@ -122,26 +122,27 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       });
     }, [pendientes, periodoSeleccionado]);
 
-  // 🔍 Filtrar datos generales/tabla por hospital y período
-  const datosFiltrados = useMemo(() => {
-    let resultado = datos;
+  // 🔍 Filtrar datos generales/tabla por hospital y período (Solo si es atenciones)
+    const datosFiltrados = useMemo(() => {
+      let resultado = datos;
 
-    if (hospitalFiltro) {
-      resultado = resultado.filter(d =>
-        d.idEfector &&
-        String(d.idEfector).toLowerCase() === String(hospitalFiltro).toLowerCase()
-      );
-    }
+      if (hospitalFiltro) {
+        resultado = resultado.filter(d =>
+          d.idEfector &&
+          String(d.idEfector).toLowerCase() === String(hospitalFiltro).toLowerCase()
+        );
+      }
 
-    if (periodoSeleccionado !== 'TODOS') {
-      resultado = resultado.filter(d => {
-        const pItem = d.periodo || convertirFechaAPeriodo(d.fecha);
-        return String(pItem) === String(periodoSeleccionado);
-      });
-    }
+      // 💡 El filtro de período solo aplica si estamos en 'atenciones'
+      if (tipo === 'atenciones' && periodoSeleccionado && periodoSeleccionado !== 'TODOS') {
+        resultado = resultado.filter(d => {
+          const pItem = d.periodo || convertirFechaAPeriodo(d.fecha);
+          return String(pItem) === String(periodoSeleccionado);
+        });
+      }
 
-    return resultado;
-  }, [datos, hospitalFiltro, periodoSeleccionado]);
+      return resultado;
+    }, [datos, hospitalFiltro, periodoSeleccionado, tipo]);
 
   // 🏥 Mostrar nombre del hospital
   const nombreHospital = useMemo(() => {
@@ -158,7 +159,8 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
       <div style={{ padding: '20px' }}>
         <h2>Hospitales pendientes de auditar</h2>
 
-        {/* 📅 Selector de Período */}
+    {/* 📅 Selector de Período (Solo se muestra para atenciones) */}
+      {tipo === 'atenciones' && (
         <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
           <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
           <select 
@@ -166,13 +168,13 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
             onChange={(e) => setPeriodoSeleccionado(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
           >
-            <option value="">Seleccione un período...</option>
             <option value="TODOS">Todos los períodos</option>
             {periodosDisponibles.map((p, idx) => (
               <option key={idx} value={p}>{p}</option>
             ))}
           </select>
         </div>
+      )}
 
         {/* Mensaje condicional inicial */}
         {periodoSeleccionado === '' ? (
