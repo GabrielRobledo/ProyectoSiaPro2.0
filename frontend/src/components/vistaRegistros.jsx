@@ -226,20 +226,22 @@ const VistaRegistros = ({ editarAuditoria = false }) => {
         {hospitalFiltro && nombreHospital && ` - Hospital: ${nombreHospital}`}
       </h2>
 
-      {/* 📅 Selector de Período */}
-      <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
-        <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
-        <select 
-          value={periodoSeleccionado} 
-          onChange={(e) => setPeriodoSeleccionado(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
-        >
-          <option value="TODOS">Todos los períodos</option>
-          {periodosDisponibles.map((p, idx) => (
-            <option key={idx} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
+      {/* 📅 Selector de Período (Solo se muestra para atenciones) */}
+      {tipo === 'atenciones' && (
+        <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', gap: '15px', background: '#fff', padding: '12px 18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', maxWidth: '400px' }}>
+          <span style={{ fontWeight: 'bold', color: '#555', fontSize: '14px' }}>📅 Período:</span>
+          <select 
+            value={periodoSeleccionado} 
+            onChange={(e) => setPeriodoSeleccionado(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '14px', flex: 1 }}
+          >
+            <option value="TODOS">Todos los períodos</option>
+            {periodosDisponibles.map((p, idx) => (
+              <option key={idx} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <TablaConFiltro
         datos={datosFiltrados}
