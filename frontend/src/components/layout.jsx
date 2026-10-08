@@ -55,17 +55,18 @@ const BasicLayout = () => {
   const extraBreadcrumbItems = pathSnippets.map((snippet, index) => {
     const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
     
-    // Lista de segmentos que actúan como menús desplegables / contenedores sin vista propia
-    const rutasSinVista = ['registros', 'auditorias', 'reportes']; 
+    // Lista completa de menús desplegables/contenedores de ambos roles
+    const rutasSinVista = ['registros', 'auditorias', 'reportes', 'usuarios']; 
     const esContenedor = rutasSinVista.includes(snippet.toLowerCase());
+    
+    // Detectar si el segmento es un ID numérico o parámetro dinámico
+    const esIdDinamico = !isNaN(snippet);
 
     return (
       <Breadcrumb.Item key={url}>
-        {esContenedor || index === pathSnippets.length - 1 ? (
-          // Si es un menú contenedor o la última página actual, se muestra como texto plano
+        {esContenedor || esIdDinamico || index === pathSnippets.length - 1 ? (
           <span>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</span>
         ) : (
-          // Si tiene una vista válida, mantiene el enlace
           <Link to={url}>{snippet.charAt(0).toUpperCase() + snippet.slice(1)}</Link>
         )}
       </Breadcrumb.Item>
