@@ -159,37 +159,37 @@ const ResumenAuditorias = () => {
                 borderCollapse: 'collapse',
               }}
             >
-              <thead>
-                <tr style={{ backgroundColor: '#1976d2', color: 'white' }}>
-                  <th style={thStyle}>Hospital</th>
-                  <th style={thStyle}>Periodo</th>
-                  <th style={thStyle}>Facturado</th>
-                  <th style={thStyle}>Débito</th>
-                  <th style={thStyle}>Neto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditorias
-                  .slice()
-                  .sort((a, b) => b.idAuditoria - a.idAuditoria)
-                  .slice(0, 5)
-                  .map((a, idx) => (
-                    <tr
-                      key={a.idAuditoria}
-                      style={{
-                        backgroundColor: idx % 2 === 0 ? '#f9f9f9' : '#fff',
-                      }}
-                    >
-                      <td style={tdStyle}>{a.Hospital}</td>
-                      <td style={tdStyle}>{a.periodo}</td>
-                      <td style={tdStyle}>${(a.totalFacturado || 0).toFixed(2)}</td>
-                      <td style={tdStyle}>${(a.totalDebito || 0).toFixed(2)}</td>
-                      <td style={tdStyle}>
-                        ${(a.totalFacturado - a.totalDebito).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
+            <thead>
+              <tr style={{ backgroundColor: '#1976d2', color: 'white' }}>
+                <th style={thStyle}>Hospital</th>
+                <th style={thStyle}>Periodo</th>
+                <th style={thStyle}>Facturado</th>
+                <th style={thStyle}>Débito</th>
+                <th style={thStyle}>Neto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditorias
+                .slice()
+                .sort((a, b) => b.idAuditoria - a.idAuditoria)
+                .slice(0, 5)
+                .map((a, idx) => (
+                  <tr
+                    key={a.idAuditoria}
+                    style={{
+                      backgroundColor: idx % 2 === 0 ? '#f9f9f9' : '#fff',
+                    }}
+                  >
+                    <td style={tdStyle}>{a.Hospital}</td>
+                    <td style={tdStyle}>{a.periodo}</td>
+                    <td style={tdStyle}>${(a.totalFacturado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                    <td style={tdStyle}>${(a.totalDebito || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                    <td style={tdStyle}>
+                      ${(a.totalFacturado - a.totalDebito).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
             </table>
           </Paper>
         </Box>
