@@ -181,7 +181,7 @@ const ResumenAuditorias = () => {
                     }}
                   >
                     <td style={tdStyle}>{a.Hospital}</td>
-                    <td style={tdStyle}>{a.periodo}</td>
+
                     <td style={tdStyle}>${(a.totalFacturado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                     <td style={tdStyle}>${(a.totalDebito || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
                     <td style={tdStyle}>
