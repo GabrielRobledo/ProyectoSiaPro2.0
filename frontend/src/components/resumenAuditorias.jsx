@@ -162,7 +162,7 @@ const ResumenAuditorias = () => {
             <thead>
               <tr style={{ backgroundColor: '#1976d2', color: 'white' }}>
                 <th style={thStyle}>Hospital</th>
-                <th style={thStyle}>Periodo</th>
+                <th style={thStyle}>Periodos</th>
                 <th style={thStyle}>Facturado</th>
                 <th style={thStyle}>Débito</th>
                 <th style={thStyle}>Neto</th>
