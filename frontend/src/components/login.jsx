@@ -10,7 +10,7 @@ import { useUser } from './contextUsers';
 
 const SITE_KEY =
   process.env.REACT_APP_RECAPTCHA_SITE_KEY ||
-  '6Le5FTAuAAAAAFZhYit-_Qj0zDjVAQaIKFYv2Drd';
+  '6LdWVDAuAAAAACHDAKPlTgyfNAYlTqc61g0pjKCs';
 
 function Login() {
   const [usuario, setUsuario] = useState('');
