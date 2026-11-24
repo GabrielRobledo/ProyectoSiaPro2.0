@@ -22,7 +22,6 @@ function Login() {
   const navigate = useNavigate();
   const { setUser } = useUser();
 
-
   const toggleMostrarPassword = () => setMostrarPassword(!mostrarPassword);
 
   const resetCaptcha = () => {
@@ -46,7 +45,7 @@ function Login() {
     if (!captchaToken) {
       Swal.fire({
         title: 'Verificación requerida',
-        text: 'Por favor completá el reCAPTCHA antes de iniciar sesión.',
+        text: 'Marcá la casilla "No soy un robot" antes de entrar.',
         icon: 'warning',
         confirmButtonText: 'Aceptar',
       });
@@ -135,7 +134,7 @@ function Login() {
               type="button"
               className="toggle-password"
               onClick={toggleMostrarPassword}
-              aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               {mostrarPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
