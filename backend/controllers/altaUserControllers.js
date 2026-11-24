@@ -3,7 +3,6 @@ const db = require('../db/conexion')
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/altaUserModels');
-const loginControllers = require('./loginControllers');
 
 const register = (req, res) => {
   const { nombre, usuario, contraseña, idTipoUsuario } = req.body;
@@ -88,10 +87,6 @@ const updateUser = (req, res) => {
     if (err) return res.status(500).json({ msg: 'Error al actualizar usuario' });
     res.json({ msg: 'Usuario actualizado correctamente' });
   });
-};
-
-const login = (req, res) => {
-  return loginControllers.login(req, res);
 };
 
 
@@ -196,7 +191,6 @@ module.exports = {
   getAllUsers,
   deleteUser,
   updateUser,
-  login,
   restoreUser,
   cambiarPassword,
   cambiarPasswordAdmin,
