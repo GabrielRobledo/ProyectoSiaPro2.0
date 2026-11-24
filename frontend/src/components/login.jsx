@@ -45,7 +45,7 @@ function Login() {
     if (!captchaToken) {
       Swal.fire({
         title: 'Verificación requerida',
-        text: 'Marcá la casilla "No soy un robot" antes de entrar.',
+        text: 'Por favor completá el reCAPTCHA antes de iniciar sesión.',
         icon: 'warning',
         confirmButtonText: 'Aceptar',
       });

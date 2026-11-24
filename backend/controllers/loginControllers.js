@@ -7,18 +7,29 @@ async function verificarRecaptcha(token, remoteIp) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
 
   if (!secret) {
-    return { ok: false, status: 500, msg: 'Falta RECAPTCHA_SECRET_KEY en Render.' };
+    return {
+      ok: false,
+      status: 500,
+      msg: 'Falta configurar RECAPTCHA_SECRET_KEY en el servidor.',
+    };
   }
 
   if (!token || typeof token !== 'string' || !token.trim()) {
-    return { ok: false, status: 400, msg: 'Marcá la casilla reCAPTCHA.' };
+    return {
+      ok: false,
+      status: 400,
+      msg: 'Por favor completá la verificación reCAPTCHA.',
+    };
   }
 
   const params = new URLSearchParams({
     secret,
     response: token.trim(),
   });
-  if (remoteIp) params.append('remoteip', remoteIp);
+
+  if (remoteIp) {
+    params.append('remoteip', remoteIp);
+  }
 
   try {
     const resp = await fetch('https://www.google.com/recaptcha/api/siteverify', {
@@ -26,26 +37,36 @@ async function verificarRecaptcha(token, remoteIp) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
     });
+
     const data = await resp.json();
 
     if (!data.success) {
       return {
         ok: false,
         status: 400,
-        msg: 'Verificación reCAPTCHA inválida o expirada. Volvé a marcarla.',
+        msg: 'La verificación reCAPTCHA no es válida o expiró. Volvé a marcarla.',
       };
     }
 
     return { ok: true };
   } catch (err) {
     console.error('Error al verificar reCAPTCHA:', err);
-    return { ok: false, status: 502, msg: 'Error al validar reCAPTCHA.' };
+    return {
+      ok: false,
+      status: 502,
+      msg: 'No se pudo verificar el reCAPTCHA. Intente nuevamente.',
+    };
   }
 }
 
 const login = async (req, res) => {
-  const { usuario, contraseña, captchaToken } = req.body;
-  const ipCliente = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+  const { usuario, contraseña } = req.body;
+  const captchaToken =
+    req.body.captchaToken ||
+    req.body.recaptchaToken ||
+    req.body['g-recaptcha-response'];
+  const ipCliente =
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
 
   const checkCaptcha = await verificarRecaptcha(captchaToken, ipCliente);
   if (!checkCaptcha.ok) {
@@ -59,6 +80,7 @@ const login = async (req, res) => {
     }
 
     if (!user) {
+      console.log('Usuario no encontrado');
       return res.status(401).json({ msg: 'Usuario no encontrado' });
     }
 
@@ -72,6 +94,7 @@ const login = async (req, res) => {
         return res.status(401).json({ msg: 'Credenciales inválidas' });
       }
 
+      // ✅ Login exitoso
       const token = jwt.sign(
         {
           idUsuario: user.idUsuario,
@@ -94,6 +117,13 @@ const login = async (req, res) => {
 
       res.json({ msg: 'Login exitoso', token, user: userResponse });
 
+      // 📝 Registrar log de inicio de sesión
+      console.log('Intentando registrar log de inicio de sesión:', {
+        idUsuario: user.idUsuario,
+        accion: 'Inicio de sesión',
+        resultado: 'Exito',
+        descripcion: 'El usuario inició sesión correctamente.',
+      });
       LogModel.crearLog(
         {
           idUsuario: user.idUsuario,
@@ -101,12 +131,18 @@ const login = async (req, res) => {
           resultado: 'Exito',
           descripcion: 'El usuario inició sesión correctamente.',
         },
-        (logErr) => {
-          if (logErr) console.error('Error al registrar log:', logErr);
+        (err, result) => {
+          if (err) {
+            console.error('Error al registrar log de inicio de sesión:', err);
+          } else {
+            console.log('✅ Log de inicio de sesión registrado', result);
+          }
         }
       );
     });
   });
 };
 
-module.exports = { login };
+module.exports = {
+  login,
+};
