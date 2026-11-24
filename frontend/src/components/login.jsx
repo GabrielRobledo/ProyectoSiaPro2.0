@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import ReCAPTCHA from 'react-google-recaptcha';
@@ -7,6 +7,10 @@ import API_URL from '../config';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from './contextUsers';
+
+const SITE_KEY =
+  process.env.REACT_APP_RECAPTCHA_SITE_KEY ||
+  '6Le5FTAuAAAAAFZhYit-_Qj0zDjVAQaIKFYv2Drd';
 
 function Login() {
   const [usuario, setUsuario] = useState('');
@@ -18,11 +22,11 @@ function Login() {
   const navigate = useNavigate();
   const { setUser } = useUser();
 
-  const toggleMostrarPassword = () => setMostrarPassword((prev) => !prev);
+  const toggleMostrarPassword = () => setMostrarPassword(!mostrarPassword);
 
   const resetCaptcha = () => {
-    recaptchaRef.current?.reset();
     setCaptchaToken(null);
+    recaptchaRef.current?.reset();
   };
 
   const handleLogin = async (e) => {
@@ -40,8 +44,8 @@ function Login() {
 
     if (!captchaToken) {
       Swal.fire({
-        title: 'Captcha requerido',
-        text: 'Por favor confirma que no eres un robot.',
+        title: 'Verificación requerida',
+        text: 'Por favor completá el reCAPTCHA antes de iniciar sesión.',
         icon: 'warning',
         confirmButtonText: 'Aceptar',
       });
@@ -58,36 +62,36 @@ function Login() {
       });
 
       const { token, user } = response.data;
-      const rol = user.rol.toLowerCase().trim();
-
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('rol', rol);
+      localStorage.setItem('rol', user.rol.toLowerCase().trim());
       setUser(user);
 
-      await Swal.fire({
+      Swal.fire({
         title: '¡Login exitoso!',
         text: 'Has iniciado sesión correctamente.',
         icon: 'success',
         confirmButtonText: 'Continuar',
+      }).then(() => {
+        if (user.rol.toLowerCase().trim() === 'administrador') {
+          navigate('/dashboard');
+        } else if (user.rol.toLowerCase().trim() === 'auditor') {
+          navigate('/dashboardAuditor');
+        }
       });
-
-      if (rol === 'administrador') {
-        navigate('/dashboard');
-      } else if (rol === 'auditor') {
-        navigate('/dashboardAuditor');
-      }
     } catch (err) {
+      const mensajeError =
+        err.response?.data?.msg ||
+        'Credenciales incorrectas o error del servidor.';
+
+      resetCaptcha();
+
       Swal.fire({
         title: 'Error de login',
-        text:
-          err.response?.data?.message ||
-          'Credenciales incorrectas o error del servidor.',
+        text: mensajeError,
         icon: 'error',
         confirmButtonText: 'Intentar nuevamente',
       });
-      // El token es de un solo uso: siempre se resetea tras un intento fallido
-      resetCaptcha();
     } finally {
       setCargando(false);
     }
@@ -98,16 +102,13 @@ function Login() {
       <div className="login-info">
         <h1>SiaPro Audit</h1>
         <p>
-          Bienvenido al sistema de auditoría de atenciones médicas. Controla,
-          supervisa y mejora la calidad de atención en instituciones de salud
-          con eficiencia, precisión y trazabilidad.
+          Bienvenido al sistema de auditoría de atenciones médicas. Controla, supervisa y mejora la calidad de atención en instituciones de salud con eficiencia, precisión y trazabilidad.
         </p>
       </div>
 
       <div className="login-form-container">
         <img src="/logo1.png" alt="Logo SiaPro Audit" className="login-logo" />
         <h2 className="title">Iniciar Sesión</h2>
-
         <form className="login-form" onSubmit={handleLogin}>
           <label htmlFor="usuario">Usuario</label>
           <input
@@ -139,22 +140,16 @@ function Login() {
             </button>
           </div>
 
-          <div className="recaptcha-container">
+          <div style={{ margin: '12px 0', display: 'flex', justifyContent: 'center' }}>
             <ReCAPTCHA
               ref={recaptchaRef}
-              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+              sitekey={SITE_KEY}
               onChange={(token) => setCaptchaToken(token)}
               onExpired={() => setCaptchaToken(null)}
-              onErrored={() => setCaptchaToken(null)}
-              hl="es"
             />
           </div>
 
-          <button
-            type="submit"
-            className="button"
-            disabled={cargando || !captchaToken}
-          >
+          <button type="submit" className="button" disabled={cargando}>
             {cargando ? 'Ingresando...' : 'Entrar'}
           </button>
         </form>
