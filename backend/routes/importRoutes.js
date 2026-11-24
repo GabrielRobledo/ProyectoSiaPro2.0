@@ -9,6 +9,33 @@ const db = require('../db/conexion');
 
 const upload = multer({ dest: 'uploads/' });
 
+function limpiarArchivoTemporal(filePath) {
+    if (filePath && fs.existsSync(filePath)) {
+        try {
+            fs.unlinkSync(filePath);
+        } catch (err) {
+            console.error('No se pudo eliminar el archivo temporal:', err);
+        }
+    }
+}
+
+function extraerUltimoJson(output) {
+    if (!output) return null;
+    const lineas = output
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+    for (let i = lineas.length - 1; i >= 0; i--) {
+        try {
+            return JSON.parse(lineas[i]);
+        } catch (_) {
+            // Continuar buscando hacia atrás si hubo líneas de log
+        }
+    }
+    return null;
+}
+
 function calcularSha256Archivo(filePath) {
     return new Promise((resolve, reject) => {
         const hash = crypto.createHash('sha256');
@@ -71,7 +98,7 @@ router.post('/verificar-archivo', upload.single('archivo'), async (req, res) => 
         console.error('Error al verificar hash del archivo:', error);
         return res.status(500).json({ error: 'Error al verificar el archivo' });
     } finally {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        limpiarArchivoTemporal(filePath);
     }
 });
 
@@ -107,46 +134,49 @@ router.post('/importar-excel', upload.single('archivo'), async (req, res) => {
     });
 
     pythonProcess.on('close', (code) => {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        limpiarArchivoTemporal(filePath);
+
+        const jsonSalida = extraerUltimoJson(outputData);
 
         if (code === 0) {
-            try {
-                const lineas = outputData.trim().split('\n');
-                const ultimaLinea = lineas[lineas.length - 1];
-                const resumen = JSON.parse(ultimaLinea);
-
+            if (jsonSalida) {
                 const esDuplicado =
-                    Boolean(resumen.alreadyImported) ||
-                    resumen.status === 'duplicate' ||
-                    Number(resumen.atencionesInsertadas || 0) === 0;
+                    Boolean(jsonSalida.alreadyImported) ||
+                    jsonSalida.status === 'duplicate' ||
+                    Number(jsonSalida.atencionesInsertadas || 0) === 0;
 
-                res.status(200).json({
+                return res.status(200).json({
                     message: esDuplicado ? 'Archivo ya importado previamente' : 'Proceso exitoso',
                     status: esDuplicado ? 'duplicate' : 'success',
                     alreadyImported: esDuplicado,
                     resumen: {
-                        ...resumen,
+                        ...jsonSalida,
                         alreadyImported: esDuplicado,
                         status: esDuplicado ? 'duplicate' : 'success'
                     }
                 });
-            } catch (parseError) {
-                res.status(200).json({
-                    message: 'Proceso exitoso',
-                    status: 'success',
-                    alreadyImported: false,
-                    resumen: {
-                        filasHoja1: 0,
-                        atencionesInsertadas: 0,
-                        beneficiariosNuevos: 0,
-                        efectoresNuevos: 0,
-                        nomencladoresInsertados: 0
-                    }
-                });
             }
+
+            return res.status(200).json({
+                message: 'Proceso exitoso',
+                status: 'success',
+                alreadyImported: false,
+                resumen: {
+                    filasHoja1: 0,
+                    atencionesInsertadas: 0,
+                    beneficiariosNuevos: 0,
+                    efectoresNuevos: 0,
+                    nomencladoresInsertados: 0
+                }
+            });
         } else {
             console.error('DETALLE DEL ERROR EN PYTHON:', errorData);
-            res.status(500).json({
+
+            if (jsonSalida?.errorType === 'FORMAT_MISMATCH' || jsonSalida?.status === 'invalid_format') {
+                return res.status(422).json(jsonSalida);
+            }
+
+            return res.status(500).json({
                 error: 'Error en el script de Python',
                 trace: errorData
             });

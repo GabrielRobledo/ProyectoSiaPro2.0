@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic, Table, Modal } from 'antd';
+import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic, Table, Modal, Tag } from 'antd';
 import { 
     CloudUploadOutlined, 
     CheckCircleOutlined, 
@@ -12,12 +12,28 @@ import {
     TeamOutlined, 
     MedicineBoxOutlined,
     DashboardOutlined,
-    HistoryOutlined 
+    HistoryOutlined,
+    TableOutlined
 } from '@ant-design/icons';
 import API_URL from '../config';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
+
+const COLUMNAS_HOJA1 = [
+    'NRO_PRESTACION', 'tipoatencion', 'FECHA_DE_PRESTACION', 'NRO_BENEFICIO',
+    'GRADO_PARENTESCO', 'APELLIDO_Y_NOMBRE', 'MODALIDAD_PRESTACION',
+    'NRO_ORDEN_DE_PRESTACION', 'MATRICULA', 'MODULO', 'NOMBRE_MODULO',
+    'PRACTICA', 'D_PRACTICA', 'F_PRACTICA', 'CANT.', 'D_PRESTACION',
+    'MODALIDAD_PRESTACION.1', 'NRO_ORDEN_PRESTACION_PRACTICA',
+    'BOCA_ATENCION', 'Valor Unitario', 'Valor Total', 'BA Externa',
+    'Efector', 'CONVENIO', 'OBSERVACIONES', 'para banco de sangre y laboratorio',
+    'cod', 'Cant. Débito', 'Debito'
+];
+
+const COLUMNAS_HOJA3 = [
+    'modulo', 'codPractica', 'DescripcionPractica', 'Valor GENERAL'
+];
 
 const UpdatePeriodoFacturacion = () => {
     const [file, setFile] = useState(null);
@@ -31,6 +47,9 @@ const UpdatePeriodoFacturacion = () => {
     // Estado para el modal de aviso previo por hash duplicado
     const [duplicadoModalVisible, setDuplicadoModalVisible] = useState(false);
     const [infoDuplicado, setInfoDuplicado] = useState(null);
+
+    // Estado para el modal de formato esperado del Excel
+    const [formatoModalVisible, setFormatoModalVisible] = useState(false);
 
     useEffect(() => {
         cargarHistorico();
@@ -85,7 +104,6 @@ const UpdatePeriodoFacturacion = () => {
             }
         } catch (error) {
             console.error('Error al verificar archivo:', error);
-            // Si falla la verificación previa, no bloqueamos el flujo normal
             setStatus({ type: '', msg: '' });
         } finally {
             setVerificando(false);
@@ -148,11 +166,32 @@ const UpdatePeriodoFacturacion = () => {
             cargarHistorico();
         } catch (error) {
             console.error('Error en la carga:', error);
-            setStatus({ 
-                type: 'error', 
-                msg: 'Hubo un fallo en la ejecución del proceso. Verifique el formato del Excel o la conexión con la base de datos.' 
-            });
-            message.error('Error al procesar el archivo.');
+            const dataErr = error.response?.data;
+
+            if (dataErr?.errorType === 'FORMAT_MISMATCH' || dataErr?.status === 'invalid_format') {
+                const partes = [dataErr.mensaje || 'El formato del archivo Excel no coincide con la estructura esperada.'];
+                if (dataErr.hojasFaltantes?.length) {
+                    partes.push(`Hojas faltantes: ${dataErr.hojasFaltantes.join(', ')}.`);
+                }
+                if (dataErr.columnasFaltantesHoja1?.length) {
+                    partes.push(`Columnas faltantes en Hoja1: ${dataErr.columnasFaltantesHoja1.join(', ')}.`);
+                }
+                if (dataErr.columnasFaltantesHoja3?.length) {
+                    partes.push(`Columnas faltantes en Hoja3: ${dataErr.columnasFaltantesHoja3.join(', ')}.`);
+                }
+
+                setStatus({
+                    type: 'error',
+                    msg: partes.join(' ')
+                });
+                message.error('El formato del Excel no coincide con el formato esperado.');
+            } else {
+                setStatus({ 
+                    type: 'error', 
+                    msg: 'Hubo un fallo en la ejecución del proceso. Verifique el formato del Excel o la conexión con la base de datos.' 
+                });
+                message.error('Error al procesar el archivo.');
+            }
         } finally {
             setLoading(false);
         }
@@ -186,7 +225,7 @@ const UpdatePeriodoFacturacion = () => {
     const getAlertTitle = () => {
         if (status.type === 'success') return 'Éxito';
         if (status.type === 'warning') return 'Archivo ya importado';
-        if (status.type === 'error') return 'Error';
+        if (status.type === 'error') return 'Error de formato / proceso';
         return 'Aviso';
     };
 
@@ -260,6 +299,50 @@ const UpdatePeriodoFacturacion = () => {
                 </ul>
             </Modal>
 
+            {/* Modal de Formato Esperado del Archivo Excel */}
+            <Modal
+                title={
+                    <Space>
+                        <TableOutlined style={{ color: '#1890ff', fontSize: '20px' }} />
+                        <span>Formato esperado del archivo Excel (.xlsx / .xlsm)</span>
+                    </Space>
+                }
+                open={formatoModalVisible}
+                onCancel={() => setFormatoModalVisible(false)}
+                width={760}
+                footer={[
+                    <Button key="cerrar" type="primary" onClick={() => setFormatoModalVisible(false)}>
+                        Entendido
+                    </Button>
+                ]}
+            >
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                    <Text>
+                        El archivo debe incluir al menos las hojas <Text code>Hoja1</Text> y <Text code>Hoja3</Text> con los encabezados esperados por el motor de importación:
+                    </Text>
+
+                    <div>
+                        <Text strong>Hoja1 (Atenciones / Prestaciones):</Text>
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {COLUMNAS_HOJA1.map((col) => (
+                                <Tag key={col} color="blue">{col}</Tag>
+                            ))}
+                        </div>
+                    </div>
+
+                    <Divider style={{ margin: '8px 0' }} />
+
+                    <div>
+                        <Text strong>Hoja3 (Nomencladores):</Text>
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {COLUMNAS_HOJA3.map((col) => (
+                                <Tag key={col} color="geekblue">{col}</Tag>
+                            ))}
+                        </div>
+                    </div>
+                </Space>
+            </Modal>
+
             {/* Cabecera del Módulo */}
             <div style={{ marginBottom: '24px' }}>
                 <Space align="center" size="middle">
@@ -281,6 +364,16 @@ const UpdatePeriodoFacturacion = () => {
                 <Col xs={24} lg={10}>
                     <Card 
                         title="Subir Archivo Mensual"
+                        extra={
+                            <Button
+                                type="link"
+                                icon={<TableOutlined />}
+                                onClick={() => setFormatoModalVisible(true)}
+                                style={{ padding: 0 }}
+                            >
+                                Ver formato esperado
+                            </Button>
+                        }
                         bordered={false}
                         style={{ 
                             height: '100%', 

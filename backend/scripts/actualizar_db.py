@@ -103,6 +103,89 @@ if previo:
     }))
     sys.exit(0)
 
+    COLUMNAS_HOJA1_REQUERIDAS = [
+    "NRO_PRESTACION",
+    "tipoatencion",
+    "FECHA_DE_PRESTACION",
+    "NRO_BENEFICIO",
+    "GRADO_PARENTESCO",
+    "APELLIDO_Y_NOMBRE",
+    "MODALIDAD_PRESTACION",
+    "NRO_ORDEN_DE_PRESTACION",
+    "MATRICULA",
+    "MODULO",
+    "NOMBRE_MODULO",
+    "PRACTICA",
+    "D_PRACTICA",
+    "F_PRACTICA",
+    "CANT.",
+    "D_PRESTACION",
+    "MODALIDAD_PRESTACION.1",
+    "NRO_ORDEN_PRESTACION_PRACTICA",
+    "BOCA_ATENCION",
+    "Valor\n Unitario",
+    "Valor Total",
+    "BA\nExterna",
+    "Efector",
+    "CONVENIO",
+    "OBSERVACIONES",
+    "para banco de sangre y laboratorio",
+    "cod",
+    "Cant.\nDébito",
+    "Debito",
+]
+
+COLUMNAS_HOJA3_REQUERIDAS = [
+    "modulo",
+    "codPractica",
+    "DescripcionPractica",
+    "Valor GENERAL",
+]
+
+try:
+    excel_file = pd.ExcelFile(file_path)
+    hojas_faltantes = [h for h in ["Hoja1", "Hoja3"] if h not in excel_file.sheet_names]
+    if hojas_faltantes:
+        print(json.dumps({
+            "status": "invalid_format",
+            "errorType": "FORMAT_MISMATCH",
+            "mensaje": f"El formato del archivo no coincide. Faltan las hojas: {', '.join(hojas_faltantes)}.",
+            "hojasFaltantes": hojas_faltantes,
+            "columnasFaltantesHoja1": [],
+            "columnasFaltantesHoja3": [],
+        }))
+        sys.exit(1)
+
+    df = pd.read_excel(excel_file, sheet_name="Hoja1")
+    dfNomen = pd.read_excel(excel_file, sheet_name="Hoja3", header=0)
+
+    faltantes_h1 = [c for c in COLUMNAS_HOJA1_REQUERIDAS if c not in df.columns]
+    faltantes_h3 = [c for c in COLUMNAS_HOJA3_REQUERIDAS if c not in dfNomen.columns]
+
+    if faltantes_h1 or faltantes_h3:
+        print(json.dumps({
+            "status": "invalid_format",
+            "errorType": "FORMAT_MISMATCH",
+            "mensaje": "El formato del archivo no coincide con la estructura esperada.",
+            "hojasFaltantes": [],
+            "columnasFaltantesHoja1": [c.replace("\n", " ").strip() for c in faltantes_h1],
+            "columnasFaltantesHoja3": [c.replace("\n", " ").strip() for c in faltantes_h3],
+        }))
+        sys.exit(1)
+
+    print(f"Filas de atenciones en Hoja1: {len(df)}")
+    print(f"Filas de nomencladores en Hoja3: {len(dfNomen)}")
+except Exception as e:
+    print(json.dumps({
+        "status": "invalid_format",
+        "errorType": "FORMAT_MISMATCH",
+        "mensaje": f"El formato del archivo no coincide o no pudo leerse correctamente: {e}",
+        "hojasFaltantes": [],
+        "columnasFaltantesHoja1": [],
+        "columnasFaltantesHoja3": [],
+    }))
+    sys.exit(1)
+
 try:
     df = pd.read_excel(file_path, sheet_name='Hoja1')
     dfNomen = pd.read_excel(file_path, sheet_name='Hoja3', header=0)
