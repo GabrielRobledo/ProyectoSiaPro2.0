@@ -1,33 +1,21 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
-import ReCAPTCHA from 'react-google-recaptcha';
 import '../styles/login.css';
 import API_URL from '../config';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from './contextUsers';
 
-const SITE_KEY =
-  process.env.REACT_APP_RECAPTCHA_SITE_KEY ||
-  '6LdWVDAuAAAAACHDAKPlTgyfNAYlTqc61g0pjKCs';
-
 function Login() {
   const [usuario, setUsuario] = useState('');
   const [contraseña, setContraseña] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState(null);
-  const recaptchaRef = useRef(null);
   const navigate = useNavigate();
   const { setUser } = useUser();
 
   const toggleMostrarPassword = () => setMostrarPassword(!mostrarPassword);
-
-  const resetCaptcha = () => {
-    setCaptchaToken(null);
-    recaptchaRef.current?.reset();
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -42,30 +30,17 @@ function Login() {
       return;
     }
 
-    if (!captchaToken) {
-      Swal.fire({
-        title: 'Verificación requerida',
-        text: 'Por favor completá el reCAPTCHA antes de iniciar sesión.',
-        icon: 'warning',
-        confirmButtonText: 'Aceptar',
-      });
-      return;
-    }
-
-    setCargando(true);
-
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, {
         usuario,
         contraseña,
-        captchaToken,
       });
 
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('rol', user.rol.toLowerCase().trim());
-      setUser(user);
+      setUser(user); 
 
       Swal.fire({
         title: '¡Login exitoso!',
@@ -79,16 +54,11 @@ function Login() {
           navigate('/dashboardAuditor');
         }
       });
+
     } catch (err) {
-      const mensajeError =
-        err.response?.data?.msg ||
-        'Credenciales incorrectas o error del servidor.';
-
-      resetCaptcha();
-
       Swal.fire({
         title: 'Error de login',
-        text: mensajeError,
+        text: 'Credenciales incorrectas o error del servidor.',
         icon: 'error',
         confirmButtonText: 'Intentar nuevamente',
       });
@@ -96,6 +66,7 @@ function Login() {
       setCargando(false);
     }
   };
+
 
   return (
     <div className="login-wrapper">
@@ -134,19 +105,10 @@ function Login() {
               type="button"
               className="toggle-password"
               onClick={toggleMostrarPassword}
-              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
             >
               {mostrarPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
-          </div>
-
-          <div style={{ margin: '12px 0', display: 'flex', justifyContent: 'center' }}>
-            <ReCAPTCHA
-              ref={recaptchaRef}
-              sitekey={SITE_KEY}
-              onChange={(token) => setCaptchaToken(token)}
-              onExpired={() => setCaptchaToken(null)}
-            />
           </div>
 
           <button type="submit" className="button" disabled={cargando}>
@@ -155,6 +117,7 @@ function Login() {
         </form>
       </div>
     </div>
+
   );
 }
 

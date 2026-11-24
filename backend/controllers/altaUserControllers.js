@@ -89,6 +89,51 @@ const updateUser = (req, res) => {
   });
 };
 
+const login = (req, res) => {
+  const { usuario, contraseña } = req.body;
+
+  if (!usuario || !contraseña) {
+    return res.status(400).json({ msg: 'Todos los campos son obligatorios' });
+  }
+
+  Usuario.getUserByUsername(usuario, (err, user) => {
+    if (err) {
+      console.error('Error al buscar usuario:', err);
+      return res.status(500).json({ msg: 'Error del servidor' });
+    }
+
+    if (!user) {
+      return res.status(401).json({ msg: 'Credenciales inválidas' });
+    }
+
+
+    // Comparar la contraseña
+    bcrypt.compare(contraseña, user.contraseña, (err, isMatch) => {
+      if (err) {
+        console.error('Error al comparar contraseñas:', err);
+        return res.status(500).json({ msg: 'Error al verificar credenciales' });
+      }
+
+      if (!isMatch) {
+        return res.status(401).json({ msg: 'Credenciales inválidas' });
+      }
+
+      // Generar token JWT
+      const token = jwt.sign(
+        {
+          idUsuario: user.idUsuario,
+          nombre: user.nombre,
+          usuario: user.usuario,
+          idTipoUsuario: user.idTipoUsuario
+        },
+        'tu_secreto_jwt', 
+        { expiresIn: '2h' }
+      );
+
+      res.json({ msg: 'Login exitoso', token, user });
+    });
+  });
+};
 
 const restoreUser = (req, res) => {
   const id = req.params.id;
@@ -191,9 +236,9 @@ module.exports = {
   getAllUsers,
   deleteUser,
   updateUser,
+  login,
   restoreUser,
   cambiarPassword,
   cambiarPasswordAdmin,
   getUserById,
 };
-
