@@ -19,6 +19,7 @@ db = pymysql.connect(
 )
 cursor = db.cursor()
 
+
 def calcular_sha256(ruta_archivo: str) -> str:
     h = hashlib.sha256()
     with open(ruta_archivo, "rb") as f:
@@ -50,14 +51,8 @@ def buscar_importacion_por_hash(hash_hex: str):
         "estado": row[5],
     }
 
+
 print('CONEXIÓN EXITOSA')
-
-if len(sys.argv) > 1:
-    file_path = sys.argv[1]
-else:
-    file_path = 'BasePami.xlsx'
-
-print(f"Procesando archivo mensual: {file_path}")
 
 check_only = "--check-only" in sys.argv
 args_limpios = [a for a in sys.argv[1:] if a != "--check-only"]
@@ -103,7 +98,9 @@ if previo:
     }))
     sys.exit(0)
 
-    COLUMNAS_HOJA1_REQUERIDAS = [
+print(f"Procesando archivo mensual: {file_path}")
+
+COLUMNAS_HOJA1_REQUERIDAS = [
     "NRO_PRESTACION",
     "tipoatencion",
     "FECHA_DE_PRESTACION",
@@ -186,15 +183,6 @@ except Exception as e:
     }))
     sys.exit(1)
 
-try:
-    df = pd.read_excel(file_path, sheet_name='Hoja1')
-    dfNomen = pd.read_excel(file_path, sheet_name='Hoja3', header=0)
-    print(f"Filas de atenciones en Hoja1: {len(df)}")
-    print(f"Filas de nomencladores en Hoja3: {len(dfNomen)}")
-except Exception as e:
-    print(f"Error al leer las hojas del Excel: {e}")
-    sys.exit(1)
-
 # =========================================================================
 # EXTRACCIÓN Y FORMATEO DEL PERIODO (aaaa-mm) DESDE FECHA_DE_PRESTACION
 # =========================================================================
@@ -203,19 +191,19 @@ try:
     if "FECHA_DE_PRESTACION" in df.columns and not df.empty:
         # Tomamos el primer valor no nulo de la columna FECHA_DE_PRESTACION
         primera_fecha_str = df["FECHA_DE_PRESTACION"].dropna().iloc[0]
-        
+
         # Convertimos el string (ej: '10-aug-24') a fecha usando pandas
         # format='%d-%b-%y' interpreta perfectamente el día, el mes abreviado en inglés y el año de 2 dígitos
         fecha_dt = pd.to_datetime(primera_fecha_str, format='%d-%b-%y')
-        
+
         # Lo formateamos como año-mes ('aaaa-mm', ej: '2024-08')
         periodo_formateado = fecha_dt.strftime('%Y-%m')
 except Exception as e:
     print(f"Aviso: No se pudo extraer automáticamente el periodo de la fecha: {e}")
     # Fallback por si la fecha viene en otro formato o está vacía
-    periodo_formateado = "2026-08" 
+    periodo_formateado = "2026-08"
 
-print(f"Periodo detectado para el histórico: {periodo_formateado}")    
+print(f"Periodo detectado para el histórico: {periodo_formateado}")
 
 # 1. VERIFICAR / CREAR TABLAS PRINCIPALES (con la columna descripcion en TEXT para evitar desbordamientos)
 cursor.execute("""CREATE TABLE IF NOT EXISTS modulos(
@@ -263,11 +251,15 @@ modulos_existentes = {row[0] for row in cursor.fetchall()}
 
 modulos_ids = set()
 for _, row in df.dropna(subset=["MODULO"]).iterrows():
-    try: modulos_ids.add(int(row["MODULO"]))
-    except: pass
+    try:
+        modulos_ids.add(int(row["MODULO"]))
+    except:
+        pass
 for _, row in dfNomen.dropna(subset=["modulo"]).iterrows():
-    try: modulos_ids.add(int(row["modulo"]))
-    except: pass
+    try:
+        modulos_ids.add(int(row["modulo"]))
+    except:
+        pass
 
 nuevos_modulos = []
 for mod_id in modulos_ids:
@@ -327,9 +319,9 @@ for _, row in df.iterrows():
         nrobene = str(int(row["NRO_BENEFICIO"])) + "-0" + str(int(row["GRADO_PARENTESCO"]))
     except:
         continue
-    
+
     if nrobene not in beneficiarios_db:
-        beneficiarios_db.add(nrobene) # Evitar duplicados dentro del mismo excel
+        beneficiarios_db.add(nrobene)
         nuevos_beneficiarios.append((str(row["APELLIDO_Y_NOMBRE"]), nrobene))
 
 if nuevos_beneficiarios:
@@ -344,9 +336,10 @@ efectores_db = {row[0] for row in cursor.fetchall()}
 nuevos_efectores = []
 for _, row in df.iterrows():
     cod_pres = row.get("cod")
-    if pd.isna(cod_pres): continue
+    if pd.isna(cod_pres):
+        continue
     cod_str = str(cod_pres)
-    
+
     if cod_str not in efectores_db:
         efectores_db.add(cod_str)
         nuevos_efectores.append((cod_str, str(row.get("Efector", "Sin nombre"))))
@@ -375,14 +368,15 @@ for _, row in df.iterrows():
         continue
     if pd.isna(row.get("NRO_BENEFICIO")) or pd.isna(row.get("GRADO_PARENTESCO")):
         continue
-    
+
     try:
         nrobene = str(int(row["NRO_BENEFICIO"])) + "-0" + str(int(row["GRADO_PARENTESCO"]))
     except:
         continue
 
     idBen = map_beneficiarios.get(nrobene)
-    if not idBen: continue
+    if not idBen:
+        continue
 
     try:
         mod_id = int(row["MODULO"])
@@ -390,10 +384,12 @@ for _, row in df.iterrows():
         idNom = map_nomencladores.get((cod_prac, mod_id))
     except:
         idNom = None
-    if not idNom: continue
+    if not idNom:
+        continue
 
     idEfec = map_efectores.get(str(row.get("cod")))
-    if not idEfec: continue
+    if not idEfec:
+        continue
 
     raw_valor_total = row.get("Valor Total", 0)
     valor_total = float(raw_valor_total) if not pd.isna(raw_valor_total) else 0.0
@@ -411,13 +407,10 @@ for _, row in df.iterrows():
 atenciones_realmente_insertadas = 0
 
 if atenciones_a_insertar:
-    # Usamos INSERT IGNORE para que la BD rechace las repetidas
     cursor.executemany("""INSERT IGNORE INTO atenciones 
                           (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
     db.commit()
-    
-    # cursor.rowcount nos da el número exacto de filas nuevas insertadas (sin contar las ignoradas)
     atenciones_realmente_insertadas = cursor.rowcount
 
 print(f"Atenciones nuevas insertadas efectivamente: {atenciones_realmente_insertadas}")
@@ -447,7 +440,6 @@ else:
 
 print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
 
-# JSON final para Node.js y React (usamos el contador real)
 ya_cargado = atenciones_realmente_insertadas == 0
 resumen = {
     "status": "duplicate" if ya_cargado else "success",
