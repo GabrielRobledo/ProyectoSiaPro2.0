@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic, Table } from 'antd';
+import { Card, Button, Upload, Typography, message, Alert, Space, Divider, Row, Col, Statistic, Table, Modal } from 'antd';
 import { 
     CloudUploadOutlined, 
     CheckCircleOutlined, 
     ExclamationCircleOutlined, 
     InfoCircleOutlined, 
+    WarningOutlined,
     FileTextOutlined, 
     UserAddOutlined, 
     TeamOutlined, 
@@ -20,13 +21,17 @@ const { Dragger } = Upload;
 
 const UpdatePeriodoFacturacion = () => {
     const [file, setFile] = useState(null);
+    const [verificando, setVerificando] = useState(false);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState({ type: '', msg: '' });
     const [resumenData, setResumenData] = useState(null);
     const [historico, setHistorico] = useState([]);
     const [loadingHistorico, setLoadingHistorico] = useState(false);
 
-    // Cargar el historial al montar el componente
+    // Estado para el modal de aviso previo por hash duplicado
+    const [duplicadoModalVisible, setDuplicadoModalVisible] = useState(false);
+    const [infoDuplicado, setInfoDuplicado] = useState(null);
+
     useEffect(() => {
         cargarHistorico();
     }, []);
@@ -43,6 +48,50 @@ const UpdatePeriodoFacturacion = () => {
         }
     };
 
+    const limpiarSeleccion = () => {
+        setFile(null);
+        setInfoDuplicado(null);
+        setDuplicadoModalVisible(false);
+        setStatus({ type: '', msg: '' });
+        setResumenData(null);
+    };
+
+    // 1. Chequeo rápido previo al seleccionar el archivo
+    const verificarArchivoPrevio = async (fileSeleccionado) => {
+        setVerificando(true);
+        setStatus({ type: 'info', msg: 'Verificando si este archivo ya fue importado...' });
+
+        try {
+            const formData = new FormData();
+            formData.append('archivo', fileSeleccionado);
+
+            const response = await axios.post(`${API_URL}/api/verificar-archivo`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (response.data?.alreadyImported) {
+                setInfoDuplicado({
+                    ...(response.data.registroPrevio || {}),
+                    hashArchivo: response.data.hashArchivo,
+                    mensaje: response.data.mensaje
+                });
+                setDuplicadoModalVisible(true);
+                setStatus({
+                    type: 'warning',
+                    msg: 'Este archivo ya figura importado previamente. Confirme o cancele en el aviso.'
+                });
+            } else {
+                setStatus({ type: '', msg: '' });
+            }
+        } catch (error) {
+            console.error('Error al verificar archivo:', error);
+            // Si falla la verificación previa, no bloqueamos el flujo normal
+            setStatus({ type: '', msg: '' });
+        } finally {
+            setVerificando(false);
+        }
+    };
+
     const handleUpload = async () => {
         if (!file) {
             message.warning('Por favor, seleccione un archivo primero.');
@@ -52,6 +101,7 @@ const UpdatePeriodoFacturacion = () => {
         const formData = new FormData();
         formData.append('archivo', file);
 
+        setDuplicadoModalVisible(false);
         setLoading(true);
         setResumenData(null);
         setStatus({ 
@@ -64,7 +114,7 @@ const UpdatePeriodoFacturacion = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
-            const dataResumen = response.data.resumen || {
+            const dataResumen = response.data.resumen || response.data || {
                 filasHoja1: 0,
                 atencionesInsertadas: 0,
                 beneficiariosNuevos: 0,
@@ -72,14 +122,30 @@ const UpdatePeriodoFacturacion = () => {
                 nomencladoresInsertados: 0
             };
 
+            const esDuplicado =
+                Boolean(response.data?.alreadyImported) ||
+                response.data?.status === 'duplicate' ||
+                dataResumen?.alreadyImported === true ||
+                dataResumen?.status === 'duplicate';
+
             setResumenData(dataResumen);
-            setStatus({ 
-                type: 'success', 
-                msg: '¡Base de datos actualizada con éxito mediante el motor Python!' 
-            });
-            message.success('Importación finalizada con éxito.');
-            setFile(null); 
-            cargarHistorico(); // Recargar la tabla histórica automáticamente
+
+            if (esDuplicado) {
+                setStatus({
+                    type: 'warning',
+                    msg: dataResumen.mensaje || response.data.mensaje || 'Este archivo ya fue importado anteriormente y no insertó registros nuevos.'
+                });
+                message.warning('El archivo ya se encontraba importado.');
+            } else {
+                setStatus({ 
+                    type: 'success', 
+                    msg: '¡Base de datos actualizada con éxito mediante el motor Python!' 
+                });
+                message.success('Importación finalizada con éxito.');
+                setFile(null);
+            }
+
+            cargarHistorico();
         } catch (error) {
             console.error('Error en la carga:', error);
             setStatus({ 
@@ -100,23 +166,30 @@ const UpdatePeriodoFacturacion = () => {
             setFile(fileSelected);
             setStatus({ type: '', msg: '' });
             setResumenData(null);
+            setInfoDuplicado(null);
+            verificarArchivoPrevio(fileSelected);
             return false;
         },
         onRemove: () => {
-            setFile(null);
-            setStatus({ type: '', msg: '' });
-            setResumenData(null);
+            limpiarSeleccion();
         },
         fileList: file ? [file] : [],
     };
 
     const getStatusIcon = () => {
         if (status.type === 'success') return <CheckCircleOutlined />;
+        if (status.type === 'warning') return <WarningOutlined />;
         if (status.type === 'error') return <ExclamationCircleOutlined />;
         return <InfoCircleOutlined />;
     };
 
-    // Columnas de la tabla histórica
+    const getAlertTitle = () => {
+        if (status.type === 'success') return 'Éxito';
+        if (status.type === 'warning') return 'Archivo ya importado';
+        if (status.type === 'error') return 'Error';
+        return 'Aviso';
+    };
+
     const columnsHistorico = [
         {
             title: '#ID',
@@ -152,9 +225,41 @@ const UpdatePeriodoFacturacion = () => {
         }
     ];
 
+    const ocupado = verificando || loading;
+
     return (
         <div style={{ padding: '30px 40px', maxWidth: '1300px', margin: '0 auto' }}>
             
+            {/* Modal de Aviso Previo por Hash Ya Importado */}
+            <Modal
+                title={
+                    <Space>
+                        <WarningOutlined style={{ color: '#faad14', fontSize: '20px' }} />
+                        <span>Aviso: Archivo ya importado</span>
+                    </Space>
+                }
+                open={duplicadoModalVisible}
+                onCancel={limpiarSeleccion}
+                footer={[
+                    <Button key="cancelar" onClick={limpiarSeleccion}>
+                        Cancelar importación
+                    </Button>,
+                    <Button key="continuar" type="primary" onClick={handleUpload}>
+                        Procesar de todas formas
+                    </Button>
+                ]}
+            >
+                <p>
+                    {infoDuplicado?.mensaje || 'Se detectó que este archivo ya fue procesado anteriormente en el historial de importaciones.'}
+                </p>
+                <ul style={{ paddingLeft: '20px', marginBottom: 0 }}>
+                    <li><strong>Período:</strong> {infoDuplicado?.periodo || '-'}</li>
+                    <li><strong>Fecha de carga:</strong> {infoDuplicado?.fechaCarga ? new Date(infoDuplicado.fechaCarga).toLocaleString() : '-'}</li>
+                    <li><strong>Filas Hoja 1:</strong> {infoDuplicado?.filasHoja1 ?? '-'}</li>
+                    <li><strong>ID Historial:</strong> #{infoDuplicado?.idHistorial ?? '-'}</li>
+                </ul>
+            </Modal>
+
             {/* Cabecera del Módulo */}
             <div style={{ marginBottom: '24px' }}>
                 <Space align="center" size="middle">
@@ -184,7 +289,7 @@ const UpdatePeriodoFacturacion = () => {
                         }}
                     >
                         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                            <Dragger {...draggerProps} disabled={loading} style={{ padding: '15px 0' }}>
+                            <Dragger {...draggerProps} disabled={ocupado} style={{ padding: '15px 0' }}>
                                 <p className="ant-upload-drag-icon">
                                     <CloudUploadOutlined style={{ color: '#1890ff', fontSize: '42px' }} />
                                 </p>
@@ -194,7 +299,7 @@ const UpdatePeriodoFacturacion = () => {
 
                             {status.msg && (
                                 <Alert
-                                    message={status.type === 'success' ? 'Éxito' : status.type === 'error' ? 'Error' : 'Aviso'}
+                                    message={getAlertTitle()}
                                     description={status.msg}
                                     type={status.type === 'info' ? 'info' : status.type}
                                     showIcon
@@ -207,9 +312,9 @@ const UpdatePeriodoFacturacion = () => {
                                 size="large"
                                 block
                                 icon={<CloudUploadOutlined />}
-                                loading={loading}
+                                loading={ocupado}
                                 onClick={handleUpload}
-                                disabled={!file}
+                                disabled={!file || ocupado}
                                 style={{ 
                                     height: '50px', 
                                     borderRadius: '8px', 
@@ -217,7 +322,11 @@ const UpdatePeriodoFacturacion = () => {
                                     fontWeight: '500' 
                                 }}
                             >
-                                {loading ? 'Procesando en segundo plano...' : 'Iniciar Sincronización'}
+                                {verificando
+                                    ? 'Verificando archivo...'
+                                    : loading
+                                    ? 'Procesando en segundo plano...'
+                                    : 'Iniciar Sincronización'}
                             </Button>
                         </Space>
                     </Card>

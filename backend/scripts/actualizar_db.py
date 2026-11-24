@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 import pymysql
 import json
+import hashlib
 
 
 # CONEXIÓN CON MYSQL
@@ -17,6 +18,38 @@ db = pymysql.connect(
     },
 )
 cursor = db.cursor()
+
+def calcular_sha256(ruta_archivo: str) -> str:
+    h = hashlib.sha256()
+    with open(ruta_archivo, "rb") as f:
+        for bloque in iter(lambda: f.read(65536), b""):
+            h.update(bloque)
+    return h.hexdigest()
+
+
+def buscar_importacion_por_hash(hash_hex: str):
+    cursor.execute(
+        """
+        SELECT idHistorial, periodo, fechaCarga, filasHoja1, atencionesInsertadas, estado
+        FROM historial_importaciones
+        WHERE hashArchivo = %s AND estado = 'Completado'
+        ORDER BY idHistorial DESC
+        LIMIT 1
+        """,
+        (hash_hex,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    return {
+        "idHistorial": row[0],
+        "periodo": row[1],
+        "fechaCarga": str(row[2]),
+        "filasHoja1": row[3],
+        "atencionesInsertadas": row[4],
+        "estado": row[5],
+    }
+
 print('CONEXIÓN EXITOSA')
 
 if len(sys.argv) > 1:
@@ -25,6 +58,50 @@ else:
     file_path = 'BasePami.xlsx'
 
 print(f"Procesando archivo mensual: {file_path}")
+
+check_only = "--check-only" in sys.argv
+args_limpios = [a for a in sys.argv[1:] if a != "--check-only"]
+file_path = args_limpios[0] if args_limpios else "BasePami.xlsx"
+
+if not os.path.exists(file_path):
+    print(json.dumps({"status": "error", "mensaje": f"No se encontró el archivo: {file_path}"}))
+    sys.exit(1)
+
+posible_hash = args_limpios[1] if len(args_limpios) > 1 else ""
+if len(posible_hash) == 64 and all(c in "0123456789abcdefABCDEF" for c in posible_hash):
+    hash_archivo = posible_hash.lower()
+else:
+    hash_archivo = calcular_sha256(file_path)
+
+previo = buscar_importacion_por_hash(hash_archivo)
+
+if check_only:
+    if previo:
+        print(json.dumps({
+            "status": "duplicate",
+            "alreadyImported": True,
+            "hashArchivo": hash_archivo,
+            "registroPrevio": previo,
+            "mensaje": f"El archivo ya fue importado para el período {previo['periodo']}."
+        }))
+    else:
+        print(json.dumps({
+            "status": "ok",
+            "alreadyImported": False,
+            "hashArchivo": hash_archivo
+        }))
+    sys.exit(0)
+
+# Si no es --check-only y ya existe, frenamos antes de leer Excel ni insertar
+if previo:
+    print(json.dumps({
+        "status": "duplicate",
+        "alreadyImported": True,
+        "hashArchivo": hash_archivo,
+        "registroPrevio": previo,
+        "mensaje": f"El archivo ya fue importado (período {previo['periodo']}, carga #{previo['idHistorial']})."
+    }))
+    sys.exit(0)
 
 try:
     df = pd.read_excel(file_path, sheet_name='Hoja1')
@@ -266,12 +343,10 @@ print(f"Atenciones nuevas insertadas efectivamente: {atenciones_realmente_insert
 # VALIDACIÓN INTELIGENTE: Solo registrar en el histórico si hubo atenciones nuevas reales
 # =========================================================================
 if atenciones_realmente_insertadas > 0:
-    nombre_archivo_actual = os.path.basename(file_path)
-    
     cursor.execute("""
         INSERT INTO historial_importaciones 
-        (periodo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (periodo, filasHoja1, atencionesInsertadas, beneficiariosNuevos, efectoresNuevos, nomencladoresInsertados, estado, hashArchivo) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         periodo_formateado,
         len(df),
@@ -279,7 +354,8 @@ if atenciones_realmente_insertadas > 0:
         len(nuevos_beneficiarios),
         len(nuevos_efectores),
         len(a_insertar_nom),
-        'Completado'
+        'Completado',
+        hash_archivo
     ))
     db.commit()
     print("Historial registrado correctamente.")
@@ -289,9 +365,16 @@ else:
 print('¡PROCESO MENSUAL CARGADO CON ÉXITO!')
 
 # JSON final para Node.js y React (usamos el contador real)
+ya_cargado = atenciones_realmente_insertadas == 0
 resumen = {
-    "status": "success",
-    "mensaje": "¡Proceso mensual cargado con éxito!",
+    "status": "duplicate" if ya_cargado else "success",
+    "alreadyImported": ya_cargado,
+    "hashArchivo": hash_archivo,
+    "periodo": periodo_formateado,
+    "mensaje": (
+        "El archivo no generó atenciones nuevas; es probable que ya haya sido procesado."
+        if ya_cargado else "¡Proceso mensual cargado con éxito!"
+    ),
     "filasHoja1": len(df),
     "modulosNuevos": len(nuevos_modulos),
     "nomencladoresInsertados": len(a_insertar_nom),
