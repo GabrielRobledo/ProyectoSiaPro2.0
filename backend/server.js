@@ -41,7 +41,7 @@ app.use('/api', efectoresRoutes);
 app.use('/api', beneficiariosRoutes);
 app.use('/api', atencionesRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api', loginRoutes);
+app.use('/api/auth', loginRoutes);
 app.use('/api', auditoriasRoutes);
 app.use('/api', asignacionRoutes);
 app.use('/api', auditoriaProgresoRoutes);

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import ReCAPTCHA from 'react-google-recaptcha';
 import '../styles/login.css';
 import API_URL from '../config';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
@@ -12,10 +13,17 @@ function Login() {
   const [contraseña, setContraseña] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const recaptchaRef = useRef(null);
   const navigate = useNavigate();
   const { setUser } = useUser();
 
-  const toggleMostrarPassword = () => setMostrarPassword(!mostrarPassword);
+  const toggleMostrarPassword = () => setMostrarPassword((prev) => !prev);
+
+  const resetCaptcha = () => {
+    recaptchaRef.current?.reset();
+    setCaptchaToken(null);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,56 +38,76 @@ function Login() {
       return;
     }
 
+    if (!captchaToken) {
+      Swal.fire({
+        title: 'Captcha requerido',
+        text: 'Por favor confirma que no eres un robot.',
+        icon: 'warning',
+        confirmButtonText: 'Aceptar',
+      });
+      return;
+    }
+
+    setCargando(true);
+
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, {
         usuario,
         contraseña,
+        captchaToken,
       });
 
       const { token, user } = response.data;
+      const rol = user.rol.toLowerCase().trim();
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('rol', user.rol.toLowerCase().trim());
-      setUser(user); 
+      localStorage.setItem('rol', rol);
+      setUser(user);
 
-      Swal.fire({
+      await Swal.fire({
         title: '¡Login exitoso!',
         text: 'Has iniciado sesión correctamente.',
         icon: 'success',
         confirmButtonText: 'Continuar',
-      }).then(() => {
-        if (user.rol.toLowerCase().trim() === 'administrador') {
-          navigate('/dashboard');
-        } else if (user.rol.toLowerCase().trim() === 'auditor') {
-          navigate('/dashboardAuditor');
-        }
       });
 
+      if (rol === 'administrador') {
+        navigate('/dashboard');
+      } else if (rol === 'auditor') {
+        navigate('/dashboardAuditor');
+      }
     } catch (err) {
       Swal.fire({
         title: 'Error de login',
-        text: 'Credenciales incorrectas o error del servidor.',
+        text:
+          err.response?.data?.message ||
+          'Credenciales incorrectas o error del servidor.',
         icon: 'error',
         confirmButtonText: 'Intentar nuevamente',
       });
+      // El token es de un solo uso: siempre se resetea tras un intento fallido
+      resetCaptcha();
     } finally {
       setCargando(false);
     }
   };
-
 
   return (
     <div className="login-wrapper">
       <div className="login-info">
         <h1>SiaPro Audit</h1>
         <p>
-          Bienvenido al sistema de auditoría de atenciones médicas. Controla, supervisa y mejora la calidad de atención en instituciones de salud con eficiencia, precisión y trazabilidad.
+          Bienvenido al sistema de auditoría de atenciones médicas. Controla,
+          supervisa y mejora la calidad de atención en instituciones de salud
+          con eficiencia, precisión y trazabilidad.
         </p>
       </div>
 
       <div className="login-form-container">
         <img src="/logo1.png" alt="Logo SiaPro Audit" className="login-logo" />
         <h2 className="title">Iniciar Sesión</h2>
+
         <form className="login-form" onSubmit={handleLogin}>
           <label htmlFor="usuario">Usuario</label>
           <input
@@ -105,19 +133,33 @@ function Login() {
               type="button"
               className="toggle-password"
               onClick={toggleMostrarPassword}
-              aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               {mostrarPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
 
-          <button type="submit" className="button" disabled={cargando}>
+          <div className="recaptcha-container">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+              onChange={(token) => setCaptchaToken(token)}
+              onExpired={() => setCaptchaToken(null)}
+              onErrored={() => setCaptchaToken(null)}
+              hl="es"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="button"
+            disabled={cargando || !captchaToken}
+          >
             {cargando ? 'Ingresando...' : 'Entrar'}
           </button>
         </form>
       </div>
     </div>
-
   );
 }
 
