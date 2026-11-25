@@ -95,6 +95,9 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
   }, [datos]);
 
 
+  // Devuelve true si el importe de la atención es 0 (o no es un número válido)
+  const importeEsCero = (row) => (parseFloat(row.valorTotal) || 0) <= 0;
+
   const handleInputChange = (rowId, value) => {
     const fila = datos.find((d) => d.idAtencion === rowId);
     if (fila && importeEsCero(fila)) return;   // importe 0: no se permite debitar
@@ -128,8 +131,6 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
     }).format(numero);
   };
 
-  const importeEsCero = (row) => (parseFloat(row.valorTotal) || 0) <= 0;
-
   const handleMotivoChange = (rowKey, motivoId) => {
     console.log('Motivo seleccionado:', motivoId); // Aquí se recibe el ID del motivo
     setMotivosValues((prev) => ({
@@ -137,6 +138,7 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
       [rowKey]: { motivo: motivoId }, // Guarda el ID, no el nombre
     }));
   };
+
   
 
   const columns = useMemo(() => {
@@ -176,26 +178,30 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
         {
           accessorKey: "__valor",
           header: "Debito (%)",
-          cell: ({ row }) => (
-          <input
-            type="number"
-            step="0.25"
-            min="0"
-            max="1"
-            value={inputValues[row.original.idAtencion] || ""}
-            onChange={(e) => handleInputChange(row.original.idAtencion, e.target.value)}
-            disabled={importeEsCero(row.original)}
-            title={importeEsCero(row.original) ? "El importe es $0, no se puede debitar" : ""}
-            style={{
-              width: "80px",
-              padding: "6px",
-              borderRadius: "5px",
-              border: "1px solid #ccc",
-              backgroundColor: importeEsCero(row.original) ? "#f0f0f0" : "white",
-              cursor: importeEsCero(row.original) ? "not-allowed" : "text",
-            }}
-          />
-          ),
+          cell: ({ row }) => {
+            const rowKey = row.original.idAtencion;
+            const sinImporte = importeEsCero(row.original);
+            return (
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                max="1"
+                value={inputValues[rowKey] || ""}
+                onChange={(e) => handleInputChange(rowKey, e.target.value)}
+                disabled={sinImporte}
+                title={sinImporte ? "El importe es $0, no se puede debitar" : ""}
+                style={{
+                  width: "80px",
+                  padding: "6px",
+                  borderRadius: "5px",
+                  border: "1px solid #ccc",
+                  backgroundColor: sinImporte ? "#f0f0f0" : "white",
+                  cursor: sinImporte ? "not-allowed" : "text",
+                }}
+              />
+            );
+          },
           enableSorting: false,
         },
 
@@ -256,22 +262,9 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
             const rowKey = row.original.idAtencion;
             return (
               <input
-                type="number"
-                step="0.25"
-                min="0"
-                max="1"
-                value={inputValues[row.original.idAtencion] || ""}
-                onChange={(e) => handleInputChange(row.original.idAtencion, e.target.value)}
-                disabled={importeEsCero(row.original)}
-                title={importeEsCero(row.original) ? "El importe es $0, no se puede debitar" : ""}
-                style={{
-                  width: "80px",
-                  padding: "6px",
-                  borderRadius: "5px",
-                  border: "1px solid #ccc",
-                  backgroundColor: importeEsCero(row.original) ? "#f0f0f0" : "white",
-                  cursor: importeEsCero(row.original) ? "not-allowed" : "text",
-                }}
+                type="checkbox"
+                checked={!!checkedRows[rowKey]}
+                onChange={(e) => handleCheckboxChange(rowKey, e.target.checked)}
               />
             );
           },
@@ -288,16 +281,25 @@ const TablaConFiltro = ({ datos, tipo, setDatos, editarAuditoriaId }) => {
           header: "Debito (%)",
           cell: ({ row }) => {
             const rowKey = row.original.idAtencion;
+            const sinImporte = importeEsCero(row.original);
             return (
               <input
                 type="number"
                 step="0.25"
                 min="0"
                 max="1"
-
                 value={inputValues[rowKey] || ""}
                 onChange={(e) => handleInputChange(rowKey, e.target.value)}
-                style={{ width: "80px", padding: "6px", borderRadius: "5px", border: "1px solid #ccc" }}
+                disabled={sinImporte}
+                title={sinImporte ? "El importe es $0, no se puede debitar" : ""}
+                style={{
+                  width: "80px",
+                  padding: "6px",
+                  borderRadius: "5px",
+                  border: "1px solid #ccc",
+                  backgroundColor: sinImporte ? "#f0f0f0" : "white",
+                  cursor: sinImporte ? "not-allowed" : "text",
+                }}
               />
             );
           },
