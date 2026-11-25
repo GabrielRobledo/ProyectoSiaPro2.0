@@ -264,7 +264,7 @@ const Reportes = () => {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Hospital", "Total Facturado", "Total Debitado", "Total Neto"].map(h => (
+                {["Hospital", "Período", "Total Facturado", "Total Debitado", "Total Neto"].map(h => (
                   <th
                     key={h}
                     style={{
