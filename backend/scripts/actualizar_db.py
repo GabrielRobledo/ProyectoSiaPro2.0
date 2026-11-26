@@ -274,8 +274,16 @@ if nuevos_modulos:
 print(f"Módulos nuevos sincronizados: {len(nuevos_modulos)}")
 
 # 3. PROCESAR NOMENCLADORES EN LOTE
-cursor.execute("SELECT codPractica, idModulo, idNomenclador FROM nomencladores")
-nomencladores_db = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+# Se traen también valorGeneral y descripcion para actualizar SOLO lo que cambió
+cursor.execute("SELECT codPractica, idModulo, idNomenclador, valorGeneral, descripcion FROM nomencladores")
+nomencladores_db = {
+    (row[0], row[1]): (
+        row[2],
+        round(float(row[3]), 2) if row[3] is not None else 0.0,
+        (row[4] or "").strip(),
+    )
+    for row in cursor.fetchall()
+}
 
 a_insertar_nom = []
 a_actualizar_nom = []
@@ -287,16 +295,18 @@ for _, row in dfNomen.iterrows():
     except:
         continue
 
-    descripcion = str(row.get("DescripcionPractica", "Sin descripción")).replace('"', '')
+    descripcion = str(row.get("DescripcionPractica", "Sin descripción")).replace('"', '').strip()
     raw_val = row.get("Valor GENERAL", 0.0)
-    valor_gen = float(raw_val) if not pd.isna(raw_val) else 0.0
+    valor_gen = round(float(raw_val), 2) if not pd.isna(raw_val) else 0.0
 
     key = (cod_prac, mod_id)
     if key not in nomencladores_db:
         a_insertar_nom.append((cod_prac, descripcion, valor_gen, mod_id))
     else:
-        id_nom = nomencladores_db[key]
-        a_actualizar_nom.append((valor_gen, descripcion, id_nom))
+        id_nom, valor_db, desc_db = nomencladores_db[key]
+        # Solo actualizar si realmente cambió el valor o la descripción
+        if valor_db != valor_gen or desc_db != descripcion:
+            a_actualizar_nom.append((valor_gen, descripcion, id_nom))
 
 if a_insertar_nom:
     cursor.executemany("""INSERT INTO nomencladores (codPractica, descripcion, valorGeneral, idModulo) 
