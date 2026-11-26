@@ -4,6 +4,17 @@ import pandas as pd
 import pymysql
 import json
 import hashlib
+import time
+
+_T0 = time.time()
+_TPREV = _T0
+
+
+def _tiempo(etiqueta):
+    global _TPREV
+    ahora = time.time()
+    print(f"[TIEMPO] {etiqueta}: {ahora - _TPREV:.1f}s (acumulado {ahora - _T0:.1f}s)", flush=True)
+    _TPREV = ahora
 
 
 # CONEXIÓN CON MYSQL
@@ -53,6 +64,7 @@ def buscar_importacion_por_hash(hash_hex: str):
 
 
 print('CONEXIÓN EXITOSA')
+_tiempo("Conexion a MySQL + hash")
 
 check_only = "--check-only" in sys.argv
 args_limpios = [a for a in sys.argv[1:] if a != "--check-only"]
@@ -204,6 +216,7 @@ except Exception as e:
     periodo_formateado = "2026-08"
 
 print(f"Periodo detectado para el histórico: {periodo_formateado}")
+_tiempo("Lectura del Excel")
 
 # 1. VERIFICAR / CREAR TABLAS PRINCIPALES (con la columna descripcion en TEXT para evitar desbordamientos)
 cursor.execute("""CREATE TABLE IF NOT EXISTS modulos(
@@ -244,6 +257,7 @@ cursor.execute("""CREATE TABLE IF NOT EXISTS atenciones(
 
 db.commit()
 print("Tablas verificadas/creadas correctamente.")
+_tiempo("Verificar/crear tablas")
 
 # 2. SINCRONIZAR MÓDULOS EN LOTE
 cursor.execute("SELECT idModulo FROM modulos")
@@ -272,6 +286,7 @@ if nuevos_modulos:
     cursor.executemany("INSERT INTO modulos (idModulo, descripcion) VALUES (%s, %s)", nuevos_modulos)
     db.commit()
 print(f"Módulos nuevos sincronizados: {len(nuevos_modulos)}")
+_tiempo("Paso 2 modulos")
 
 # 3. PROCESAR NOMENCLADORES EN LOTE
 # Se traen también valorGeneral y descripcion para actualizar SOLO lo que cambió
@@ -316,6 +331,7 @@ if a_actualizar_nom:
                           WHERE idNomenclador = %s""", a_actualizar_nom)
 db.commit()
 print(f"Nomencladores insertados: {len(a_insertar_nom)}, actualizados: {len(a_actualizar_nom)}")
+_tiempo("Paso 3 nomencladores")
 
 # 4. PROCESAR BENEFICIARIOS EN LOTE
 cursor.execute("SELECT NroBeneficiario FROM beneficiarios")
@@ -338,6 +354,7 @@ if nuevos_beneficiarios:
     cursor.executemany("INSERT INTO beneficiarios (apeYnom, NroBeneficiario) VALUES (%s, %s)", nuevos_beneficiarios)
     db.commit()
 print(f"Beneficiarios nuevos agregados: {len(nuevos_beneficiarios)}")
+_tiempo("Paso 4 beneficiarios")
 
 # 5. PROCESAR EFECTORES EN LOTE
 cursor.execute("SELECT codPrestador FROM efectores")
@@ -358,6 +375,7 @@ if nuevos_efectores:
     cursor.executemany("INSERT INTO efectores (codPrestador, RazonSocial) VALUES (%s, %s)", nuevos_efectores)
     db.commit()
 print(f"Efectores nuevos agregados: {len(nuevos_efectores)}")
+_tiempo("Paso 5 efectores")
 
 # RECARGAR DICCIONARIOS DE MAPEO PARA LAS ATENCIONES
 cursor.execute("SELECT NroBeneficiario, idBeneficiario FROM beneficiarios")
@@ -371,6 +389,7 @@ map_efectores = {str(row[0]): row[1] for row in cursor.fetchall()}
 
 # 6. INSERTAR ATENCIONES EN LOTE (Usando INSERT IGNORE para frenar duplicados)
 print("Preparando e insertando Atenciones del período...")
+_tiempo("Recarga de diccionarios")
 atenciones_a_insertar = []
 
 for _, row in df.iterrows():
@@ -425,6 +444,7 @@ if atenciones_a_insertar:
     atenciones_realmente_insertadas = cursor.rowcount
 
 print(f"Atenciones nuevas insertadas efectivamente: {atenciones_realmente_insertadas}")
+_tiempo("Paso 6 atenciones (armado + INSERT)")
 
 # =========================================================================
 # VALIDACIÓN INTELIGENTE: Solo registrar en el histórico si hubo atenciones nuevas reales
@@ -469,4 +489,5 @@ resumen = {
     "efectoresNuevos": len(nuevos_efectores),
     "atencionesInsertadas": atenciones_realmente_insertadas,
 }
+_tiempo("Cierre / historial")
 print(json.dumps(resumen))
