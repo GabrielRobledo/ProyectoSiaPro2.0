@@ -481,7 +481,7 @@ resumen = {
         "El archivo no generó atenciones nuevas; es probable que ya haya sido procesado."
         if ya_cargado else "¡Proceso mensual cargado con éxito!"
     ),
-    "filasHoja1": len(df),
+    "filasAtenciones": len(df),
     "modulosNuevos": len(nuevos_modulos),
     "nomencladoresInsertados": len(a_insertar_nom),
     "nomencladoresActualizados": len(a_actualizar_nom),
