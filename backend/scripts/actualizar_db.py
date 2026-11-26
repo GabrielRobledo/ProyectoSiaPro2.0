@@ -407,9 +407,10 @@ for _, row in df.iterrows():
 atenciones_realmente_insertadas = 0
 
 if atenciones_a_insertar:
-    cursor.executemany("""INSERT IGNORE INTO atenciones 
-                          (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector) 
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", atenciones_a_insertar)
+    cursor.executemany("""INSERT INTO atenciones
+                      (tipoAtencion, fecha, idBeneficiario, idNomenclador, fechaPractica, cantidad, valorTotal, idEfector)
+                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                      ON DUPLICATE KEY UPDATE idAtencion = idAtencion""", atenciones_a_insertar)
     db.commit()
     atenciones_realmente_insertadas = cursor.rowcount
 
